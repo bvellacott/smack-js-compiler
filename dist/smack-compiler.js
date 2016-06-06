@@ -12427,6 +12427,7 @@ var antlr4 = require('antlr4');
 var SmackLexer = require('./smack/SmackLexer').SmackLexer;
 var SmackParser = require('./smack/SmackParser').SmackParser;
 var compilers = require('./compilers');
+var stdlib = require('./stdlib');
 
 module.exports = (function () {
 	var createUnit = function createUnit(name, smkSource, targetSource, pack, funcNames, methodContext) {
@@ -12452,19 +12453,33 @@ module.exports = (function () {
 		return parser.smkFile();
 	};
 
+	var initMethodContext = function initMethodContext(ctx, methodContext) {
+		if (!methodContext || typeof methodContext !== 'object') throw 'The method context must be an object';
+		// Add the standard library if it's missing
+		stdlib.extend(methodContext);
+		var packParts = compilers.getPackageParts(ctx.packageDecl(0));
+		var curObj = methodContext;
+		for (var i = 0; i < packParts.length; i++) {
+			if (!curObj[packParts[i]] || typeof curObj[packParts[i]] !== 'object') curObj[packParts[i]] = { _f: {} };
+			curObj = curObj[packParts[i]];
+		}
+	};
+
 	return function (name, smkSource, methodContext) {
 		var tree = getParseTree(smkSource);
+		initMethodContext(tree, methodContext);
 		var pack = compilers.compilePackageDecl(tree.packageDecl(0));
 		var result = compilers.compileSmkFile(tree, methodContext);
-		return createUnit(name, smkSource, result.source, pack, result.funcNames, methodContext);
+		eval(result.src);
+		return createUnit(name, smkSource, result.src, pack, result.funcNames, methodContext);
 	};
 })();
-},{"./compilers":48,"./smack/SmackLexer":50,"./smack/SmackParser":52,"antlr4":41}],48:[function(require,module,exports){
+},{"./compilers":48,"./smack/SmackLexer":51,"./smack/SmackParser":53,"./stdlib":55,"antlr4":41}],48:[function(require,module,exports){
 'use strict';
 
 var SmackParser = require('./smack/SmackParser').SmackParser;
 var jsGenerators = require('./jsGenerators');
-var stdlib = require('./stdlib');
+var newCompileResult = require('./general').newCompileResult;
 
 module.exports = (function () {
 	return {
@@ -12473,9 +12488,11 @@ module.exports = (function () {
 			for (var i = 0; dottedId.Id(i); i++) ids.push(dottedId.Id(i).getText());
 			return ids;
 		},
+		getPackageParts: function getPackageParts(ctx) {
+			return this.getIds(ctx.dottedId(0));
+		},
 		compilePackageDecl: function compilePackageDecl(ctx) {
-			var ids = this.getIds(ctx.dottedId(0));
-			return jsGenerators.generatePackageDecl(ids);
+			return jsGenerators.generatePackageDecl(this.getPackageParts(ctx));
 		},
 		compileComment: function compileComment(ctx) {
 			return jsGenerators.generateComment(ctx.getText());
@@ -12550,7 +12567,7 @@ module.exports = (function () {
 			var statement = ctx.children[0];
 			var src;
 			if (statement instanceof SmackParser.VarAssignContext) src = this.compileVarAssign(statement, pack, methodContext);else if (statement instanceof SmackParser.FuncInvokeContext) src = this.compileFuncInvoke(statement, pack, methodContext);else if (statement instanceof SmackParser.RetStatementContext) src = this.compileRetStatement(statement, pack, methodContext);
-			return src + ';';
+			return jsGenerators.generateClosedStatement(src);
 		},
 		compileLoop: function compileLoop(ctx, pack, methodContext) {
 			var expressionSrc = this.compileExpression(ctx.expression(0), pack, methodContext);
@@ -12587,7 +12604,6 @@ module.exports = (function () {
 			return jsGenerators.generateCodeBlock(sentenceSrcs);
 		},
 		compileFuncDecl: function compileFuncDecl(ctx, pack, methodContext) {
-			var source = '';
 			var codeBlockSrc;
 			var ids = [];
 
@@ -12598,36 +12614,43 @@ module.exports = (function () {
 			return jsGenerators.generateFuncDecl(pack, ids, codeBlockSrc, methodContext);
 		},
 		compileSmkFile: function compileSmkFile(ctx, methodContext) {
-			if (!methodContext || typeof methodContext !== 'object') throw 'The method context must be an object';
-			// Add the standard library if it's missing
-			stdlib.extend(methodContext);
 			var pack = this.compilePackageDecl(ctx.packageDecl(0));
-			var packParts = pack.split('.');
-			var curObj = methodContext;
-			for (var i = 0; i < packParts.length; i++) {
-				if (!curObj[packParts[i]] || typeof curObj[packParts[i]] !== 'object') curObj[packParts[i]] = { _f: {} };
-				curObj = curObj[packParts[i]];
-			}
 			var funcNames = [];
-			var source = '';
+			var funcDeclSrcs = [];
 			for (var i = 0; i < ctx.children.length; i++) {
 				var c = ctx.children[i];
 				if (c instanceof SmackParser.FuncDeclContext) {
-					source += 'methodContext.' + this.compileFuncDecl(c, pack, methodContext);
+					funcDeclSrcs.push(this.compileFuncDecl(c, pack, methodContext));
 					funcNames.push(c.Id(0).getText());
 				}
 			}
-			eval(source);
-			return {
-				source: source,
-				funcNames: funcNames,
-				methodContext: methodContext
-			};
+			var smkFileResult = jsGenerators.generateSmkFile(funcDeclSrcs, methodContext);
+			smkFileResult.pack = pack;
+			smkFileResult.funcNames = funcNames;
+			smkFileResult.methodContext = methodContext;
+			return smkFileResult;
 		}
 	};
 })();
-},{"./jsGenerators":49,"./smack/SmackParser":52,"./stdlib":54}],49:[function(require,module,exports){
+},{"./general":49,"./jsGenerators":50,"./smack/SmackParser":53}],49:[function(require,module,exports){
+"use strict";
+
+module.exports = {
+	newCompileResult: function newCompileResult(src, childResults) {
+		var vars;
+		if (childResults != null) {
+			if (childResults.src) vars = childResults.vars ? childResults.vars : [];else {
+				vars = [];
+				for (var i = 0; childResults != null && i < childResults.length; i++) vars.concat(childResults[i].vars);
+			}
+		}
+		return { src: src, vars: vars };
+	}
+};
+},{}],50:[function(require,module,exports){
 'use strict';
+
+var newCompileResult = require('./general').newCompileResult;
 
 module.exports = (function () {
 	return {
@@ -12639,6 +12662,10 @@ module.exports = (function () {
 		},
 		generateComment: function generateComment(str) {
 			return ' '; //'// ' + str + '\n';
+		},
+		generateClosedStatement: function generateClosedStatement(openStatSrc) {
+			openStatSrc.src += ';';
+			return openStatSrc;
 		},
 		generateVarAssign: function generateVarAssign(jsonPathSrc, expressionSrc) {
 			return jsonPathSrc + '=' + expressionSrc;
@@ -12750,10 +12777,15 @@ module.exports = (function () {
 			}
 			source += ')' + codeBlockSrc;
 			return source;
+		},
+		generateSmkFile: function generateSmkFile(funcDeclSrcs, methodContext) {
+			var src = '';
+			for (var i = 0; i < funcDeclSrcs.length; i++) src += 'methodContext.' + funcDeclSrcs[i];
+			return newCompileResult(src);
 		}
 	};
 })();
-},{}],50:[function(require,module,exports){
+},{"./general":49}],51:[function(require,module,exports){
 // Generated from ./Smack.g4 by ANTLR 4.5.3
 // jshint ignore: start
 "use strict";
@@ -12830,7 +12862,7 @@ SmackLexer.ruleNames = ["T__0", "T__1", "T__2", "T__3", "T__4", "T__5", "T__6", 
 SmackLexer.grammarFileName = "Smack.g4";
 
 exports.SmackLexer = SmackLexer;
-},{"antlr4":41}],51:[function(require,module,exports){
+},{"antlr4":41}],52:[function(require,module,exports){
 // Generated from ./Smack.g4 by ANTLR 4.5.3
 // jshint ignore: start
 'use strict';
@@ -13081,7 +13113,7 @@ SmackListener.prototype.enterValue = function (ctx) {};
 SmackListener.prototype.exitValue = function (ctx) {};
 
 exports.SmackListener = SmackListener;
-},{"antlr4":41}],52:[function(require,module,exports){
+},{"antlr4":41}],53:[function(require,module,exports){
 // Generated from ./Smack.g4 by ANTLR 4.5.3
 // jshint ignore: start
 'use strict';var antlr4=require('antlr4');var SmackListener=require('./SmackListener').SmackListener;var SmackVisitor=require('./SmackVisitor').SmackVisitor;var grammarFileName="Smack.g4";var serializedATN=['\u0003а훑舆괭䐗껱趀ꫝ','\u0003*ė\u0004\u0002\t\u0002\u0004\u0003\t\u0003\u0004\u0004\t','\u0004\u0004\u0005\t\u0005\u0004\u0006\t\u0006\u0004\u0007\t\u0007\u0004','\b\t\b\u0004\t\t\t\u0004\n\t\n\u0004\u000b\t\u000b\u0004\f\t\f\u0004','\r\t\r\u0004\u000e\t\u000e\u0004\u000f\t\u000f\u0004\u0010\t\u0010\u0004','\u0011\t\u0011\u0004\u0012\t\u0012\u0004\u0013\t\u0013\u0004\u0014\t','\u0014\u0004\u0015\t\u0015\u0004\u0016\t\u0016\u0004\u0017\t\u0017\u0004','\u0018\t\u0018\u0003\u0002\u0003\u0002\u0007\u00023\n\u0002\f\u0002','\u000e\u00026\u000b\u0002\u0003\u0003\u0003\u0003\u0003\u0003\u0003','\u0003\u0003\u0004\u0003\u0004\u0003\u0004\u0003\u0004\u0003\u0005\u0003','\u0005\u0003\u0005\u0003\u0005\u0005\u0005D\n\u0005\u0003\u0005\u0003','\u0005\u0007\u0005H\n\u0005\f\u0005\u000e\u0005K\u000b\u0005\u0003\u0005','\u0003\u0005\u0003\u0005\u0003\u0006\u0003\u0006\u0003\u0006\u0005\u0006','S\n\u0006\u0003\u0006\u0003\u0006\u0007\u0006W\n\u0006\f\u0006\u000e','\u0006Z\u000b\u0006\u0003\u0006\u0003\u0006\u0003\u0007\u0003\u0007','\u0007\u0007`\n\u0007\f\u0007\u000e\u0007c\u000b\u0007\u0003\b\u0003','\b\u0003\b\u0007\bh\n\b\f\b\u000e\bk\u000b\b\u0003\t\u0003\t\u0003\t','\u0003\t\u0003\n\u0003\n\u0003\n\u0003\u000b\u0003\u000b\u0003\u000b','\u0003\u000b\u0003\u000b\u0003\u000b\u0007\u000bz\n\u000b\f\u000b\u000e','\u000b}\u000b\u000b\u0003\u000b\u0005\u000b\n\u000b\u0003\f\u0003','\f\u0003\f\u0003\f\u0003\f\u0003\f\u0003\f\u0003\r\u0003\r\u0003\r\u0003','\u000e\u0003\u000e\u0003\u000e\u0003\u000e\u0003\u000e\u0003\u000e\u0003','\u000f\u0003\u000f\u0003\u000f\u0003\u000f\u0003\u000f\u0003\u000f\u0003','\u000f\u0003\u000f\u0003\u000f\u0003\u000f\u0005\u000f\n\u000f','\u0003\u000f\u0003\u000f\u0003\u000f\u0003\u000f\u0003\u000f\u0003\u000f','\u0003\u000f\u0003\u000f\u0003\u000f\u0003\u000f\u0003\u000f\u0003\u000f','\u0003\u000f\u0003\u000f\u0006\u000f¬\n\u000f\r\u000f\u000e\u000f','­\u0003\u000f\u0003\u000f\u0003\u000f\u0003\u000f\u0003\u000f\u0003','\u000f\u0003\u000f\u0003\u000f\u0003\u000f\u0003\u000f\u0003\u000f\u0003','\u000f\u0003\u000f\u0003\u000f\u0003\u000f\u0003\u000f\u0003\u000f\u0003','\u000f\u0003\u000f\u0003\u000f\u0003\u000f\u0003\u000f\u0003\u000f\u0003','\u000f\u0003\u000f\u0007\u000fÉ\n\u000f\f\u000f\u000e\u000fÌ','\u000b\u000f\u0003\u0010\u0003\u0010\u0003\u0010\u0005\u0010Ñ\n','\u0010\u0003\u0011\u0003\u0011\u0007\u0011Õ\n\u0011\f\u0011\u000e','\u0011Ø\u000b\u0011\u0003\u0011\u0003\u0011\u0003\u0012\u0003\u0012','\u0003\u0012\u0003\u0012\u0003\u0012\u0005\u0012á\n\u0012\u0003','\u0013\u0003\u0013\u0003\u0013\u0005\u0013æ\n\u0013\u0003\u0014','\u0003\u0014\u0005\u0014ê\n\u0014\u0003\u0015\u0003\u0015\u0003','\u0015\u0003\u0015\u0007\u0015ð\n\u0015\f\u0015\u000e\u0015ó','\u000b\u0015\u0003\u0015\u0003\u0015\u0003\u0015\u0003\u0015\u0005\u0015','ù\n\u0015\u0003\u0016\u0003\u0016\u0003\u0016\u0003\u0016\u0003','\u0017\u0003\u0017\u0003\u0017\u0003\u0017\u0007\u0017ă\n\u0017','\f\u0017\u000e\u0017Ć\u000b\u0017\u0003\u0017\u0003\u0017\u0003','\u0017\u0003\u0017\u0005\u0017Č\n\u0017\u0003\u0018\u0003\u0018','\u0003\u0018\u0003\u0018\u0003\u0018\u0003\u0018\u0003\u0018\u0005\u0018','ĕ\n\u0018\u0003\u0018\u0002\u0003\u001c\u0019\u0002\u0004\u0006','\b\n\f\u000e\u0010\u0012\u0014\u0016\u0018\u001a\u001c\u001e "$&(*',',.\u0002\u0003\u0003\u0002\u001b\u001cī\u00020\u0003\u0002\u0002','\u0002\u00047\u0003\u0002\u0002\u0002\u0006;\u0003\u0002\u0002\u0002','\b?\u0003\u0002\u0002\u0002\nO\u0003\u0002\u0002\u0002\f]\u0003\u0002','\u0002\u0002\u000ed\u0003\u0002\u0002\u0002\u0010l\u0003\u0002\u0002','\u0002\u0012p\u0003\u0002\u0002\u0002\u0014s\u0003\u0002\u0002\u0002','\u0016\u0003\u0002\u0002\u0002\u0018\u0003\u0002\u0002\u0002','\u001a\u0003\u0002\u0002\u0002\u001c\u0003\u0002\u0002\u0002','\u001eÐ\u0003\u0002\u0002\u0002 Ò\u0003\u0002\u0002\u0002','"à\u0003\u0002\u0002\u0002$å\u0003\u0002\u0002\u0002&é','\u0003\u0002\u0002\u0002(ø\u0003\u0002\u0002\u0002*ú\u0003','\u0002\u0002\u0002,ċ\u0003\u0002\u0002\u0002.Ĕ\u0003\u0002','\u0002\u000204\u0005\u0004\u0003\u000213\u0005\b\u0005\u000221\u0003','\u0002\u0002\u000236\u0003\u0002\u0002\u000242\u0003\u0002\u0002\u0002','45\u0003\u0002\u0002\u00025\u0003\u0003\u0002\u0002\u000264\u0003\u0002','\u0002\u000278\u0007\u0003\u0002\u000289\u0005\u000e\b\u00029:\u0007','\u0004\u0002\u0002:\u0005\u0003\u0002\u0002\u0002;<\u0005\f\u0007\u0002','<=\u0007\u0005\u0002\u0002=>\u0005\u001c\u000f\u0002>\u0007\u0003\u0002','\u0002\u0002?@\u0007\u0006\u0002\u0002@A\u0007&\u0002\u0002AC\u0007','\u0007\u0002\u0002BD\u0007&\u0002\u0002CB\u0003\u0002\u0002\u0002CD','\u0003\u0002\u0002\u0002DI\u0003\u0002\u0002\u0002EF\u0007\b\u0002\u0002','FH\u0007&\u0002\u0002GE\u0003\u0002\u0002\u0002HK\u0003\u0002\u0002','\u0002IG\u0003\u0002\u0002\u0002IJ\u0003\u0002\u0002\u0002JL\u0003\u0002','\u0002\u0002KI\u0003\u0002\u0002\u0002LM\u0007\t\u0002\u0002MN\u0005',' \u0011\u0002N\t\u0003\u0002\u0002\u0002OP\u0005\u000e\b\u0002PR\u0007','\u0007\u0002\u0002QS\u0005\u001e\u0010\u0002RQ\u0003\u0002\u0002\u0002','RS\u0003\u0002\u0002\u0002SX\u0003\u0002\u0002\u0002TU\u0007\b\u0002','\u0002UW\u0005\u001e\u0010\u0002VT\u0003\u0002\u0002\u0002WZ\u0003\u0002','\u0002\u0002XV\u0003\u0002\u0002\u0002XY\u0003\u0002\u0002\u0002Y[\u0003','\u0002\u0002\u0002ZX\u0003\u0002\u0002\u0002[\\\u0007\t\u0002\u0002','\\\u000b\u0003\u0002\u0002\u0002]a\u0007&\u0002\u0002^`\u0005\u0010','\t\u0002_^\u0003\u0002\u0002\u0002`c\u0003\u0002\u0002\u0002a_\u0003','\u0002\u0002\u0002ab\u0003\u0002\u0002\u0002b\r\u0003\u0002\u0002\u0002','ca\u0003\u0002\u0002\u0002di\u0007&\u0002\u0002ef\u0007\n\u0002\u0002','fh\u0007&\u0002\u0002ge\u0003\u0002\u0002\u0002hk\u0003\u0002\u0002','\u0002ig\u0003\u0002\u0002\u0002ij\u0003\u0002\u0002\u0002j\u000f\u0003','\u0002\u0002\u0002ki\u0003\u0002\u0002\u0002lm\u0007\u000b\u0002\u0002','mn\u0005\u001e\u0010\u0002no\u0007\f\u0002\u0002o\u0011\u0003\u0002','\u0002\u0002pq\u0007\r\u0002\u0002qr\u0005\u001c\u000f\u0002r\u0013','\u0003\u0002\u0002\u0002st\u0007\u000e\u0002\u0002tu\u0007\u0007\u0002','\u0002uv\u0005\u001c\u000f\u0002vw\u0007\t\u0002\u0002w{\u0005 \u0011','\u0002xz\u0005\u0016\f\u0002yx\u0003\u0002\u0002\u0002z}\u0003\u0002','\u0002\u0002{y\u0003\u0002\u0002\u0002{|\u0003\u0002\u0002\u0002|','\u0003\u0002\u0002\u0002}{\u0003\u0002\u0002\u0002~\u0005\u0018','\r\u0002~\u0003\u0002\u0002\u0002\u0003\u0002\u0002','\u0002\u0015\u0003\u0002\u0002\u0002\u0007\u000f\u0002','\u0002\u0007\u000e\u0002\u0002\u0007\u0007\u0002','\u0002\u0005\u001c\u000f\u0002\u0007\t\u0002','\u0002\u0005 \u0011\u0002\u0017\u0003\u0002\u0002','\u0002\u0007\u000f\u0002\u0002\u0005 \u0011','\u0002\u0019\u0003\u0002\u0002\u0002\u0007\u0010\u0002','\u0002\u0007\u0007\u0002\u0002\u0005\u001c\u000f','\u0002\u0007\t\u0002\u0002\u0005 \u0011\u0002','\u001b\u0003\u0002\u0002\u0002\b\u000f\u0001\u0002','\u0007\u0007\u0002\u0002\u0005\u001c\u000f\u0002','\u0007\t\u0002\u0002\u0003\u0002\u0002\u0002','\u0007\u001c\u0002\u0002\u0005\u001c\u000f\r','\u0007\u001d\u0002\u0002\u0005\u001c\u000f\f','\u0005\u001e\u0010\u0002\u0003\u0002\u0002\u0002','\u0003\u0002\u0002\u0002\u0003\u0002\u0002\u0002','\u0003\u0002\u0002\u0002Ê\u0003\u0002\u0002\u0002','\f\u0012\u0002\u0002\u0007\u0017\u0002\u0002','É\u0005\u001c\u000f\u0012 ¡\f\u0011\u0002\u0002','¡¢\u0007\u0018\u0002\u0002¢É\u0005\u001c\u000f\u0012','£¤\f\u0010\u0002\u0002¤¥\u0007\u0019\u0002\u0002','¥É\u0005\u001c\u000f\u0011¦§\f\u000f\u0002\u0002','§¨\u0007\u001a\u0002\u0002¨É\u0005\u001c\u000f\u0010','©«\f\u000e\u0002\u0002ª¬\t\u0002\u0002\u0002«','ª\u0003\u0002\u0002\u0002¬­\u0003\u0002\u0002\u0002­','«\u0003\u0002\u0002\u0002­®\u0003\u0002\u0002\u0002®','¯\u0003\u0002\u0002\u0002¯É\u0005\u001c\u000f\u000f°','±\f\u000b\u0002\u0002±²\u0007\u001e\u0002\u0002²','É\u0005\u001c\u000f\f³´\f\n\u0002\u0002´µ\u0007','\u001f\u0002\u0002µÉ\u0005\u001c\u000f\u000b¶·\f','\t\u0002\u0002·¸\u0007 \u0002\u0002¸É\u0005\u001c','\u000f\n¹º\f\b\u0002\u0002º»\u0007!\u0002\u0002','»É\u0005\u001c\u000f\t¼½\f\u0007\u0002\u0002½','¾\u0007"\u0002\u0002¾É\u0005\u001c\u000f\b¿À','\f\u0006\u0002\u0002ÀÁ\u0007#\u0002\u0002ÁÉ\u0005','\u001c\u000f\u0007ÂÃ\f\u0005\u0002\u0002ÃÄ\u0007','$\u0002\u0002ÄÉ\u0005\u001c\u000f\u0006ÅÆ\f\u0004','\u0002\u0002ÆÇ\u0007%\u0002\u0002ÇÉ\u0005\u001c','\u000f\u0005È\u0003\u0002\u0002\u0002È \u0003\u0002','\u0002\u0002È£\u0003\u0002\u0002\u0002È¦\u0003\u0002','\u0002\u0002È©\u0003\u0002\u0002\u0002È°\u0003\u0002','\u0002\u0002È³\u0003\u0002\u0002\u0002È¶\u0003\u0002','\u0002\u0002È¹\u0003\u0002\u0002\u0002È¼\u0003\u0002','\u0002\u0002È¿\u0003\u0002\u0002\u0002ÈÂ\u0003\u0002','\u0002\u0002ÈÅ\u0003\u0002\u0002\u0002ÉÌ\u0003\u0002','\u0002\u0002ÊÈ\u0003\u0002\u0002\u0002ÊË\u0003\u0002','\u0002\u0002Ë\u001d\u0003\u0002\u0002\u0002ÌÊ\u0003\u0002','\u0002\u0002ÍÑ\u0005.\u0018\u0002ÎÑ\u0005\f\u0007','\u0002ÏÑ\u0005\n\u0006\u0002ÐÍ\u0003\u0002\u0002','\u0002ÐÎ\u0003\u0002\u0002\u0002ÐÏ\u0003\u0002\u0002','\u0002Ñ\u001f\u0003\u0002\u0002\u0002ÒÖ\u0007\u0011\u0002','\u0002ÓÕ\u0005"\u0012\u0002ÔÓ\u0003\u0002\u0002','\u0002ÕØ\u0003\u0002\u0002\u0002ÖÔ\u0003\u0002\u0002','\u0002Ö×\u0003\u0002\u0002\u0002×Ù\u0003\u0002\u0002','\u0002ØÖ\u0003\u0002\u0002\u0002ÙÚ\u0007\u0012\u0002','\u0002Ú!\u0003\u0002\u0002\u0002ÛÜ\u0005$\u0013\u0002','ÜÝ\u0007\u0004\u0002\u0002Ýá\u0003\u0002\u0002\u0002','Þá\u0005\u001a\u000e\u0002ßá\u0005\u0014\u000b\u0002','àÛ\u0003\u0002\u0002\u0002àÞ\u0003\u0002\u0002\u0002','àß\u0003\u0002\u0002\u0002á#\u0003\u0002\u0002\u0002','âæ\u0005\u0006\u0004\u0002ãæ\u0005\n\u0006\u0002','äæ\u0005\u0012\n\u0002åâ\u0003\u0002\u0002\u0002','åã\u0003\u0002\u0002\u0002åä\u0003\u0002\u0002\u0002','æ%\u0003\u0002\u0002\u0002çê\u0005(\u0015\u0002è','ê\u0005,\u0017\u0002éç\u0003\u0002\u0002\u0002é','è\u0003\u0002\u0002\u0002ê\'\u0003\u0002\u0002\u0002ë','ì\u0007\u0011\u0002\u0002ìñ\u0005*\u0016\u0002í','î\u0007\b\u0002\u0002îð\u0005*\u0016\u0002ïí','\u0003\u0002\u0002\u0002ðó\u0003\u0002\u0002\u0002ñï','\u0003\u0002\u0002\u0002ñò\u0003\u0002\u0002\u0002òô','\u0003\u0002\u0002\u0002óñ\u0003\u0002\u0002\u0002ôõ','\u0007\u0012\u0002\u0002õù\u0003\u0002\u0002\u0002ö÷','\u0007\u0011\u0002\u0002÷ù\u0007\u0012\u0002\u0002øë','\u0003\u0002\u0002\u0002øö\u0003\u0002\u0002\u0002ù)','\u0003\u0002\u0002\u0002úû\u0007)\u0002\u0002ûü','\u0007\u0013\u0002\u0002üý\u0005.\u0018\u0002ý+\u0003','\u0002\u0002\u0002þÿ\u0007\u000b\u0002\u0002ÿĄ\u0005','.\u0018\u0002Āā\u0007\b\u0002\u0002āă\u0005.\u0018','\u0002ĂĀ\u0003\u0002\u0002\u0002ăĆ\u0003\u0002\u0002','\u0002ĄĂ\u0003\u0002\u0002\u0002Ąą\u0003\u0002\u0002','\u0002ąć\u0003\u0002\u0002\u0002ĆĄ\u0003\u0002\u0002','\u0002ćĈ\u0007\f\u0002\u0002ĈČ\u0003\u0002\u0002','\u0002ĉĊ\u0007\u000b\u0002\u0002ĊČ\u0007\f\u0002','\u0002ċþ\u0003\u0002\u0002\u0002ċĉ\u0003\u0002\u0002','\u0002Č-\u0003\u0002\u0002\u0002čĕ\u0007)\u0002\u0002','Ďĕ\u0007*\u0002\u0002ďĕ\u0005(\u0015\u0002Đ','ĕ\u0005,\u0017\u0002đĕ\u0007\u0014\u0002\u0002Ē','ĕ\u0007\u0015\u0002\u0002ēĕ\u0007\u0016\u0002\u0002Ĕ','č\u0003\u0002\u0002\u0002ĔĎ\u0003\u0002\u0002\u0002Ĕ','ď\u0003\u0002\u0002\u0002ĔĐ\u0003\u0002\u0002\u0002Ĕ','đ\u0003\u0002\u0002\u0002ĔĒ\u0003\u0002\u0002\u0002Ĕ','ē\u0003\u0002\u0002\u0002ĕ/\u0003\u0002\u0002\u0002\u0019','4CIRXai{­ÈÊÐÖàåé','ñøĄċĔ'].join("");var atn=new antlr4.atn.ATNDeserializer().deserialize(serializedATN);var decisionsToDFA=atn.decisionToState.map(function(ds,index){return new antlr4.dfa.DFA(ds,index);});var sharedContextCache=new antlr4.PredictionContextCache();var literalNames=[null,"'pack'","';'","'='","'func'","'('","','","')'","'.'","'['","']'","'ret'","'if'","'else'","'while'","'{'","'}'","':'","'true'","'false'","'null'","'^'","'*'","'/'","'%'","'+'","'-'","'!'","'=='","'!='","'<'","'<='","'>'","'>='","'&&'","'||'"];var symbolicNames=[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Pow","Mul","Div","Mod","Plus","Minus","Not","Eq","Neq","Lt","Le","Gt","Ge","And","Or","Id","Comment","WS","STRING","NUMBER"];var ruleNames=["smkFile","packageDecl","varAssign","funcDecl","funcInvoke","jsonPath","dottedId","keyRef","retStatement","ifStat","elseIfStat","elseStat","loop","expression","resolvable","codeBlock","sentence","statement","json","object","pair","array","value"];function SmackParser(input){antlr4.Parser.call(this,input);this._interp = new antlr4.atn.ParserATNSimulator(this,atn,decisionsToDFA,sharedContextCache);this.ruleNames = ruleNames;this.literalNames = literalNames;this.symbolicNames = symbolicNames;return this;}SmackParser.prototype = Object.create(antlr4.Parser.prototype);SmackParser.prototype.constructor = SmackParser;Object.defineProperty(SmackParser.prototype,"atn",{get:function get(){return atn;}});SmackParser.EOF = antlr4.Token.EOF;SmackParser.T__0 = 1;SmackParser.T__1 = 2;SmackParser.T__2 = 3;SmackParser.T__3 = 4;SmackParser.T__4 = 5;SmackParser.T__5 = 6;SmackParser.T__6 = 7;SmackParser.T__7 = 8;SmackParser.T__8 = 9;SmackParser.T__9 = 10;SmackParser.T__10 = 11;SmackParser.T__11 = 12;SmackParser.T__12 = 13;SmackParser.T__13 = 14;SmackParser.T__14 = 15;SmackParser.T__15 = 16;SmackParser.T__16 = 17;SmackParser.T__17 = 18;SmackParser.T__18 = 19;SmackParser.T__19 = 20;SmackParser.Pow = 21;SmackParser.Mul = 22;SmackParser.Div = 23;SmackParser.Mod = 24;SmackParser.Plus = 25;SmackParser.Minus = 26;SmackParser.Not = 27;SmackParser.Eq = 28;SmackParser.Neq = 29;SmackParser.Lt = 30;SmackParser.Le = 31;SmackParser.Gt = 32;SmackParser.Ge = 33;SmackParser.And = 34;SmackParser.Or = 35;SmackParser.Id = 36;SmackParser.Comment = 37;SmackParser.WS = 38;SmackParser.STRING = 39;SmackParser.NUMBER = 40;SmackParser.RULE_smkFile = 0;SmackParser.RULE_packageDecl = 1;SmackParser.RULE_varAssign = 2;SmackParser.RULE_funcDecl = 3;SmackParser.RULE_funcInvoke = 4;SmackParser.RULE_jsonPath = 5;SmackParser.RULE_dottedId = 6;SmackParser.RULE_keyRef = 7;SmackParser.RULE_retStatement = 8;SmackParser.RULE_ifStat = 9;SmackParser.RULE_elseIfStat = 10;SmackParser.RULE_elseStat = 11;SmackParser.RULE_loop = 12;SmackParser.RULE_expression = 13;SmackParser.RULE_resolvable = 14;SmackParser.RULE_codeBlock = 15;SmackParser.RULE_sentence = 16;SmackParser.RULE_statement = 17;SmackParser.RULE_json = 18;SmackParser.RULE_object = 19;SmackParser.RULE_pair = 20;SmackParser.RULE_array = 21;SmackParser.RULE_value = 22;function SmkFileContext(parser,parent,invokingState){if(parent === undefined){parent = null;}if(invokingState === undefined || invokingState === null){invokingState = -1;}antlr4.ParserRuleContext.call(this,parent,invokingState);this.parser = parser;this.ruleIndex = SmackParser.RULE_smkFile;return this;}SmkFileContext.prototype = Object.create(antlr4.ParserRuleContext.prototype);SmkFileContext.prototype.constructor = SmkFileContext;SmkFileContext.prototype.packageDecl = function(){return this.getTypedRuleContext(PackageDeclContext,0);};SmkFileContext.prototype.funcDecl = function(i){if(i === undefined){i = null;}if(i === null){return this.getTypedRuleContexts(FuncDeclContext);}else {return this.getTypedRuleContext(FuncDeclContext,i);}};SmkFileContext.prototype.enterRule = function(listener){if(listener instanceof SmackListener){listener.enterSmkFile(this);}};SmkFileContext.prototype.exitRule = function(listener){if(listener instanceof SmackListener){listener.exitSmkFile(this);}};SmkFileContext.prototype.accept = function(visitor){if(visitor instanceof SmackVisitor){return visitor.visitSmkFile(this);}else {return visitor.visitChildren(this);}};SmackParser.SmkFileContext = SmkFileContext;SmackParser.prototype.smkFile = function(){var localctx=new SmkFileContext(this,this._ctx,this.state);this.enterRule(localctx,0,SmackParser.RULE_smkFile);var _la=0; // Token type
@@ -13094,7 +13126,7 @@ try{this.enterOuterAlt(localctx,1);this.state = 153;switch(this._input.LA(1)){ca
 try{this.enterOuterAlt(localctx,1);this.state = 208;this.match(SmackParser.T__14);this.state = 212;this._errHandler.sync(this);_la = this._input.LA(1);while((_la - 11 & ~0x1f) == 0 && (1 << _la - 11 & (1 << SmackParser.T__10 - 11 | 1 << SmackParser.T__11 - 11 | 1 << SmackParser.T__13 - 11 | 1 << SmackParser.Id - 11)) !== 0) {this.state = 209;this.sentence();this.state = 214;this._errHandler.sync(this);_la = this._input.LA(1);}this.state = 215;this.match(SmackParser.T__15);}catch(re) {if(re instanceof antlr4.error.RecognitionException){localctx.exception = re;this._errHandler.reportError(this,re);this._errHandler.recover(this,re);}else {throw re;}}finally {this.exitRule();}return localctx;};function SentenceContext(parser,parent,invokingState){if(parent === undefined){parent = null;}if(invokingState === undefined || invokingState === null){invokingState = -1;}antlr4.ParserRuleContext.call(this,parent,invokingState);this.parser = parser;this.ruleIndex = SmackParser.RULE_sentence;return this;}SentenceContext.prototype = Object.create(antlr4.ParserRuleContext.prototype);SentenceContext.prototype.constructor = SentenceContext;SentenceContext.prototype.statement = function(){return this.getTypedRuleContext(StatementContext,0);};SentenceContext.prototype.loop = function(){return this.getTypedRuleContext(LoopContext,0);};SentenceContext.prototype.ifStat = function(){return this.getTypedRuleContext(IfStatContext,0);};SentenceContext.prototype.enterRule = function(listener){if(listener instanceof SmackListener){listener.enterSentence(this);}};SentenceContext.prototype.exitRule = function(listener){if(listener instanceof SmackListener){listener.exitSentence(this);}};SentenceContext.prototype.accept = function(visitor){if(visitor instanceof SmackVisitor){return visitor.visitSentence(this);}else {return visitor.visitChildren(this);}};SmackParser.SentenceContext = SentenceContext;SmackParser.prototype.sentence = function(){var localctx=new SentenceContext(this,this._ctx,this.state);this.enterRule(localctx,32,SmackParser.RULE_sentence);try{this.state = 222;switch(this._input.LA(1)){case SmackParser.T__10:case SmackParser.Id:this.enterOuterAlt(localctx,1);this.state = 217;this.statement();this.state = 218;this.match(SmackParser.T__1);break;case SmackParser.T__13:this.enterOuterAlt(localctx,2);this.state = 220;this.loop();break;case SmackParser.T__11:this.enterOuterAlt(localctx,3);this.state = 221;this.ifStat();break;default:throw new antlr4.error.NoViableAltException(this);}}catch(re) {if(re instanceof antlr4.error.RecognitionException){localctx.exception = re;this._errHandler.reportError(this,re);this._errHandler.recover(this,re);}else {throw re;}}finally {this.exitRule();}return localctx;};function StatementContext(parser,parent,invokingState){if(parent === undefined){parent = null;}if(invokingState === undefined || invokingState === null){invokingState = -1;}antlr4.ParserRuleContext.call(this,parent,invokingState);this.parser = parser;this.ruleIndex = SmackParser.RULE_statement;return this;}StatementContext.prototype = Object.create(antlr4.ParserRuleContext.prototype);StatementContext.prototype.constructor = StatementContext;StatementContext.prototype.varAssign = function(){return this.getTypedRuleContext(VarAssignContext,0);};StatementContext.prototype.funcInvoke = function(){return this.getTypedRuleContext(FuncInvokeContext,0);};StatementContext.prototype.retStatement = function(){return this.getTypedRuleContext(RetStatementContext,0);};StatementContext.prototype.enterRule = function(listener){if(listener instanceof SmackListener){listener.enterStatement(this);}};StatementContext.prototype.exitRule = function(listener){if(listener instanceof SmackListener){listener.exitStatement(this);}};StatementContext.prototype.accept = function(visitor){if(visitor instanceof SmackVisitor){return visitor.visitStatement(this);}else {return visitor.visitChildren(this);}};SmackParser.StatementContext = StatementContext;SmackParser.prototype.statement = function(){var localctx=new StatementContext(this,this._ctx,this.state);this.enterRule(localctx,34,SmackParser.RULE_statement);try{this.state = 227;this._errHandler.sync(this);var la_=this._interp.adaptivePredict(this._input,16,this._ctx);switch(la_){case 1:this.enterOuterAlt(localctx,1);this.state = 224;this.varAssign();break;case 2:this.enterOuterAlt(localctx,2);this.state = 225;this.funcInvoke();break;case 3:this.enterOuterAlt(localctx,3);this.state = 226;this.retStatement();break;}}catch(re) {if(re instanceof antlr4.error.RecognitionException){localctx.exception = re;this._errHandler.reportError(this,re);this._errHandler.recover(this,re);}else {throw re;}}finally {this.exitRule();}return localctx;};function JsonContext(parser,parent,invokingState){if(parent === undefined){parent = null;}if(invokingState === undefined || invokingState === null){invokingState = -1;}antlr4.ParserRuleContext.call(this,parent,invokingState);this.parser = parser;this.ruleIndex = SmackParser.RULE_json;return this;}JsonContext.prototype = Object.create(antlr4.ParserRuleContext.prototype);JsonContext.prototype.constructor = JsonContext;JsonContext.prototype.object = function(){return this.getTypedRuleContext(ObjectContext,0);};JsonContext.prototype.array = function(){return this.getTypedRuleContext(ArrayContext,0);};JsonContext.prototype.enterRule = function(listener){if(listener instanceof SmackListener){listener.enterJson(this);}};JsonContext.prototype.exitRule = function(listener){if(listener instanceof SmackListener){listener.exitJson(this);}};JsonContext.prototype.accept = function(visitor){if(visitor instanceof SmackVisitor){return visitor.visitJson(this);}else {return visitor.visitChildren(this);}};SmackParser.JsonContext = JsonContext;SmackParser.prototype.json = function(){var localctx=new JsonContext(this,this._ctx,this.state);this.enterRule(localctx,36,SmackParser.RULE_json);try{this.state = 231;switch(this._input.LA(1)){case SmackParser.T__14:this.enterOuterAlt(localctx,1);this.state = 229;this.object();break;case SmackParser.T__8:this.enterOuterAlt(localctx,2);this.state = 230;this.array();break;default:throw new antlr4.error.NoViableAltException(this);}}catch(re) {if(re instanceof antlr4.error.RecognitionException){localctx.exception = re;this._errHandler.reportError(this,re);this._errHandler.recover(this,re);}else {throw re;}}finally {this.exitRule();}return localctx;};function ObjectContext(parser,parent,invokingState){if(parent === undefined){parent = null;}if(invokingState === undefined || invokingState === null){invokingState = -1;}antlr4.ParserRuleContext.call(this,parent,invokingState);this.parser = parser;this.ruleIndex = SmackParser.RULE_object;return this;}ObjectContext.prototype = Object.create(antlr4.ParserRuleContext.prototype);ObjectContext.prototype.constructor = ObjectContext;ObjectContext.prototype.pair = function(i){if(i === undefined){i = null;}if(i === null){return this.getTypedRuleContexts(PairContext);}else {return this.getTypedRuleContext(PairContext,i);}};ObjectContext.prototype.enterRule = function(listener){if(listener instanceof SmackListener){listener.enterObject(this);}};ObjectContext.prototype.exitRule = function(listener){if(listener instanceof SmackListener){listener.exitObject(this);}};ObjectContext.prototype.accept = function(visitor){if(visitor instanceof SmackVisitor){return visitor.visitObject(this);}else {return visitor.visitChildren(this);}};SmackParser.ObjectContext = ObjectContext;SmackParser.prototype.object = function(){var localctx=new ObjectContext(this,this._ctx,this.state);this.enterRule(localctx,38,SmackParser.RULE_object);var _la=0; // Token type
 try{this.state = 246;this._errHandler.sync(this);var la_=this._interp.adaptivePredict(this._input,19,this._ctx);switch(la_){case 1:this.enterOuterAlt(localctx,1);this.state = 233;this.match(SmackParser.T__14);this.state = 234;this.pair();this.state = 239;this._errHandler.sync(this);_la = this._input.LA(1);while(_la === SmackParser.T__5) {this.state = 235;this.match(SmackParser.T__5);this.state = 236;this.pair();this.state = 241;this._errHandler.sync(this);_la = this._input.LA(1);}this.state = 242;this.match(SmackParser.T__15);break;case 2:this.enterOuterAlt(localctx,2);this.state = 244;this.match(SmackParser.T__14);this.state = 245;this.match(SmackParser.T__15);break;}}catch(re) {if(re instanceof antlr4.error.RecognitionException){localctx.exception = re;this._errHandler.reportError(this,re);this._errHandler.recover(this,re);}else {throw re;}}finally {this.exitRule();}return localctx;};function PairContext(parser,parent,invokingState){if(parent === undefined){parent = null;}if(invokingState === undefined || invokingState === null){invokingState = -1;}antlr4.ParserRuleContext.call(this,parent,invokingState);this.parser = parser;this.ruleIndex = SmackParser.RULE_pair;return this;}PairContext.prototype = Object.create(antlr4.ParserRuleContext.prototype);PairContext.prototype.constructor = PairContext;PairContext.prototype.STRING = function(){return this.getToken(SmackParser.STRING,0);};PairContext.prototype.value = function(){return this.getTypedRuleContext(ValueContext,0);};PairContext.prototype.enterRule = function(listener){if(listener instanceof SmackListener){listener.enterPair(this);}};PairContext.prototype.exitRule = function(listener){if(listener instanceof SmackListener){listener.exitPair(this);}};PairContext.prototype.accept = function(visitor){if(visitor instanceof SmackVisitor){return visitor.visitPair(this);}else {return visitor.visitChildren(this);}};SmackParser.PairContext = PairContext;SmackParser.prototype.pair = function(){var localctx=new PairContext(this,this._ctx,this.state);this.enterRule(localctx,40,SmackParser.RULE_pair);try{this.enterOuterAlt(localctx,1);this.state = 248;this.match(SmackParser.STRING);this.state = 249;this.match(SmackParser.T__16);this.state = 250;this.value();}catch(re) {if(re instanceof antlr4.error.RecognitionException){localctx.exception = re;this._errHandler.reportError(this,re);this._errHandler.recover(this,re);}else {throw re;}}finally {this.exitRule();}return localctx;};function ArrayContext(parser,parent,invokingState){if(parent === undefined){parent = null;}if(invokingState === undefined || invokingState === null){invokingState = -1;}antlr4.ParserRuleContext.call(this,parent,invokingState);this.parser = parser;this.ruleIndex = SmackParser.RULE_array;return this;}ArrayContext.prototype = Object.create(antlr4.ParserRuleContext.prototype);ArrayContext.prototype.constructor = ArrayContext;ArrayContext.prototype.value = function(i){if(i === undefined){i = null;}if(i === null){return this.getTypedRuleContexts(ValueContext);}else {return this.getTypedRuleContext(ValueContext,i);}};ArrayContext.prototype.enterRule = function(listener){if(listener instanceof SmackListener){listener.enterArray(this);}};ArrayContext.prototype.exitRule = function(listener){if(listener instanceof SmackListener){listener.exitArray(this);}};ArrayContext.prototype.accept = function(visitor){if(visitor instanceof SmackVisitor){return visitor.visitArray(this);}else {return visitor.visitChildren(this);}};SmackParser.ArrayContext = ArrayContext;SmackParser.prototype.array = function(){var localctx=new ArrayContext(this,this._ctx,this.state);this.enterRule(localctx,42,SmackParser.RULE_array);var _la=0; // Token type
 try{this.state = 265;this._errHandler.sync(this);var la_=this._interp.adaptivePredict(this._input,21,this._ctx);switch(la_){case 1:this.enterOuterAlt(localctx,1);this.state = 252;this.match(SmackParser.T__8);this.state = 253;this.value();this.state = 258;this._errHandler.sync(this);_la = this._input.LA(1);while(_la === SmackParser.T__5) {this.state = 254;this.match(SmackParser.T__5);this.state = 255;this.value();this.state = 260;this._errHandler.sync(this);_la = this._input.LA(1);}this.state = 261;this.match(SmackParser.T__9);break;case 2:this.enterOuterAlt(localctx,2);this.state = 263;this.match(SmackParser.T__8);this.state = 264;this.match(SmackParser.T__9);break;}}catch(re) {if(re instanceof antlr4.error.RecognitionException){localctx.exception = re;this._errHandler.reportError(this,re);this._errHandler.recover(this,re);}else {throw re;}}finally {this.exitRule();}return localctx;};function ValueContext(parser,parent,invokingState){if(parent === undefined){parent = null;}if(invokingState === undefined || invokingState === null){invokingState = -1;}antlr4.ParserRuleContext.call(this,parent,invokingState);this.parser = parser;this.ruleIndex = SmackParser.RULE_value;return this;}ValueContext.prototype = Object.create(antlr4.ParserRuleContext.prototype);ValueContext.prototype.constructor = ValueContext;ValueContext.prototype.STRING = function(){return this.getToken(SmackParser.STRING,0);};ValueContext.prototype.NUMBER = function(){return this.getToken(SmackParser.NUMBER,0);};ValueContext.prototype.object = function(){return this.getTypedRuleContext(ObjectContext,0);};ValueContext.prototype.array = function(){return this.getTypedRuleContext(ArrayContext,0);};ValueContext.prototype.enterRule = function(listener){if(listener instanceof SmackListener){listener.enterValue(this);}};ValueContext.prototype.exitRule = function(listener){if(listener instanceof SmackListener){listener.exitValue(this);}};ValueContext.prototype.accept = function(visitor){if(visitor instanceof SmackVisitor){return visitor.visitValue(this);}else {return visitor.visitChildren(this);}};SmackParser.ValueContext = ValueContext;SmackParser.prototype.value = function(){var localctx=new ValueContext(this,this._ctx,this.state);this.enterRule(localctx,44,SmackParser.RULE_value);try{this.state = 274;switch(this._input.LA(1)){case SmackParser.STRING:this.enterOuterAlt(localctx,1);this.state = 267;this.match(SmackParser.STRING);break;case SmackParser.NUMBER:this.enterOuterAlt(localctx,2);this.state = 268;this.match(SmackParser.NUMBER);break;case SmackParser.T__14:this.enterOuterAlt(localctx,3);this.state = 269;this.object();break;case SmackParser.T__8:this.enterOuterAlt(localctx,4);this.state = 270;this.array();break;case SmackParser.T__17:this.enterOuterAlt(localctx,5);this.state = 271;this.match(SmackParser.T__17);break;case SmackParser.T__18:this.enterOuterAlt(localctx,6);this.state = 272;this.match(SmackParser.T__18);break;case SmackParser.T__19:this.enterOuterAlt(localctx,7);this.state = 273;this.match(SmackParser.T__19);break;default:throw new antlr4.error.NoViableAltException(this);}}catch(re) {if(re instanceof antlr4.error.RecognitionException){localctx.exception = re;this._errHandler.reportError(this,re);this._errHandler.recover(this,re);}else {throw re;}}finally {this.exitRule();}return localctx;};SmackParser.prototype.sempred = function(localctx,ruleIndex,predIndex){switch(ruleIndex){case 13:return this.expression_sempred(localctx,predIndex);default:throw "No predicate with index:" + ruleIndex;}};SmackParser.prototype.expression_sempred = function(localctx,predIndex){switch(predIndex){case 0:return this.precpred(this._ctx,16);case 1:return this.precpred(this._ctx,15);case 2:return this.precpred(this._ctx,14);case 3:return this.precpred(this._ctx,13);case 4:return this.precpred(this._ctx,12);case 5:return this.precpred(this._ctx,9);case 6:return this.precpred(this._ctx,8);case 7:return this.precpred(this._ctx,7);case 8:return this.precpred(this._ctx,6);case 9:return this.precpred(this._ctx,5);case 10:return this.precpred(this._ctx,4);case 11:return this.precpred(this._ctx,3);case 12:return this.precpred(this._ctx,2);default:throw "No predicate with index:" + predIndex;}};exports.SmackParser = SmackParser;
-},{"./SmackListener":51,"./SmackVisitor":53,"antlr4":41}],53:[function(require,module,exports){
+},{"./SmackListener":52,"./SmackVisitor":54,"antlr4":41}],54:[function(require,module,exports){
 // Generated from ./Smack.g4 by ANTLR 4.5.3
 // jshint ignore: start
 'use strict';
@@ -13229,7 +13261,7 @@ SmackVisitor.prototype.visitArray = function (ctx) {};
 SmackVisitor.prototype.visitValue = function (ctx) {};
 
 exports.SmackVisitor = SmackVisitor;
-},{"antlr4":41}],54:[function(require,module,exports){
+},{"antlr4":41}],55:[function(require,module,exports){
 'use strict';
 
 module.exports.extend = function (mc) {

@@ -1,6 +1,6 @@
 var SmackParser = require('./smack/SmackParser').SmackParser;
 var jsGenerators = require('./jsGenerators');
-var stdlib = require('./stdlib');
+var newCompileResult = require('./general').newCompileResult;
 
 module.exports = (function(){
 	return {
@@ -10,9 +10,11 @@ module.exports = (function(){
 				ids.push(dottedId.Id(i).getText());
 			return ids;
 		},
+		getPackageParts : function(ctx) {
+			return this.getIds(ctx.dottedId(0));
+		},
 		compilePackageDecl : function(ctx) {
-			var ids = this.getIds(ctx.dottedId(0));
-			return jsGenerators.generatePackageDecl(ids);
+			return jsGenerators.generatePackageDecl(this.getPackageParts(ctx));
 		},
 		compileComment : function(ctx) {
 			return jsGenerators.generateComment(ctx.getText());
@@ -119,7 +121,7 @@ module.exports = (function(){
 				src = this.compileFuncInvoke(statement, pack, methodContext);
 			else if(statement instanceof SmackParser.RetStatementContext)
 				src = this.compileRetStatement(statement, pack, methodContext);
-			return src + ';';
+			return jsGenerators.generateClosedStatement(src);
 		},
 		compileLoop : function(ctx, pack, methodContext) {
 			var expressionSrc = this.compileExpression(ctx.expression(0), pack, methodContext);
@@ -164,7 +166,6 @@ module.exports = (function(){
 			return jsGenerators.generateCodeBlock(sentenceSrcs);
 		},
 		compileFuncDecl : function(ctx, pack, methodContext) {
-			var source = '';
 			var codeBlockSrc 
 			var ids = [];
 			
@@ -178,33 +179,21 @@ module.exports = (function(){
 			return jsGenerators.generateFuncDecl(pack, ids, codeBlockSrc, methodContext);
 		},
 		compileSmkFile : function(ctx, methodContext) {
-			if(!methodContext || typeof methodContext !== 'object')
-				throw 'The method context must be an object';
-			// Add the standard library if it's missing
-			stdlib.extend(methodContext);
 			var pack = this.compilePackageDecl(ctx.packageDecl(0));
-			var packParts = pack.split('.');
-			var curObj = methodContext;
-			for(var i = 0; i < packParts.length; i++) {
-				if(!curObj[packParts[i]] || typeof curObj[packParts[i]] !== 'object')
-					curObj[packParts[i]] = { _f : {} };
-				curObj = curObj[packParts[i]];
-			}
 			var funcNames = [];
-			var source = '';
+			var funcDeclSrcs = [];
 			for(var i = 0; i < ctx.children.length; i++) {
 				var c = ctx.children[i];
 				if(c instanceof SmackParser.FuncDeclContext) {
-					source += 'methodContext.' + this.compileFuncDecl(c, pack, methodContext);
+					funcDeclSrcs.push(this.compileFuncDecl(c, pack, methodContext));
 					funcNames.push(c.Id(0).getText());
 				}
 			}
-			eval(source);
-			return {
-				source : source,
-				funcNames : funcNames,
-				methodContext : methodContext
-			};
+			var smkFileResult = jsGenerators.generateSmkFile(funcDeclSrcs, methodContext);
+			smkFileResult.pack = pack;
+			smkFileResult.funcNames = funcNames;
+			smkFileResult.methodContext = methodContext;
+			return smkFileResult;
 		}
 	}
 })();

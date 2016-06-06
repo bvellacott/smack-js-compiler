@@ -13,8 +13,8 @@ var _module = {};
 'use strict';
 
 module.exports = function (test, getFileContents, Smack) {
-	getFileContents('testCode/arithmetics.smk', function (source) {
-		test("Arithmetics", function (t) {
+	test("Arithmetics", function (t) {
+		getFileContents('testCode/arithmetics.smk', function (source) {
 
 			var mc = {};
 
@@ -567,8 +567,8 @@ module.exports = function (test, getFileContents, Smack) {
 		});
 	});
 
-	getFileContents('testCode/varAssign.smk', function (source) {
-		test("Assign", function (t) {
+	test("Assign", function (t) {
+		getFileContents('testCode/varAssign.smk', function (source) {
 			var mc = {};
 
 			console.log(source);
@@ -580,8 +580,8 @@ module.exports = function (test, getFileContents, Smack) {
 		});
 	});
 
-	getFileContents('testCode/ifElse.smk', function (source) {
-		test("If Else", function (t) {
+	test("If Else", function (t) {
+		getFileContents('testCode/ifElse.smk', function (source) {
 			var mc = {};
 
 			console.log(source);
@@ -601,8 +601,8 @@ module.exports = function (test, getFileContents, Smack) {
 		});
 	});
 
-	getFileContents('testCode/while.smk', function (source) {
 	test("While and exec()", function (t) {
+		getFileContents('testCode/while.smk', function (source) {
 			var mc = {};
 
 			console.log(source);
@@ -618,8 +618,8 @@ module.exports = function (test, getFileContents, Smack) {
 		});
 	});
 
-	getFileContents('testCode/invoke.smk', function (source) {
-		test("Invoke", function (t) {
+	test("Invoke", function (t) {
+		getFileContents('testCode/invoke.smk', function (source) {
 			var mc = {};
 
 			console.log(source);

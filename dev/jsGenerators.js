@@ -1,3 +1,5 @@
+var newCompileResult = require('./general').newCompileResult;
+
 module.exports = (function(){
 	return {
 		generateDottedId : function(ids) {
@@ -8,6 +10,10 @@ module.exports = (function(){
 		},
 		generateComment : function(str) {
 			return ' ';//'// ' + str + '\n';
+		},
+		generateClosedStatement : function(openStatSrc) {
+			openStatSrc += ';';
+			return openStatSrc;
 		},
 		generateVarAssign : function(jsonPathSrc, expressionSrc) {
 			return jsonPathSrc + '=' + expressionSrc;
@@ -129,6 +135,12 @@ module.exports = (function(){
 			}
 			source += ')' + codeBlockSrc;
 			return source;
+		},
+		generateSmkFile : function(funcDeclSrcs, methodContext) {
+			var src = '';
+			for(var i = 0; i < funcDeclSrcs.length; i++)
+				src += 'methodContext.' + funcDeclSrcs[i];
+			return newCompileResult(src);
 		},
 	};
 })();
