@@ -1,1 +1,1 @@
-module.exports = require('./dev/where-eval.js');
+module.exports = require('./dev/smack-js-compiler.js');
