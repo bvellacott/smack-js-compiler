@@ -12468,10 +12468,10 @@ module.exports = (function () {
 	return function (name, smkSource, methodContext) {
 		var tree = getParseTree(smkSource);
 		initMethodContext(tree, methodContext);
-		var pack = compilers.compilePackageDecl(tree.packageDecl(0));
 		var result = compilers.compileSmkFile(tree, methodContext);
-		eval(result.src);
-		return createUnit(name, smkSource, result.src, pack, result.funcNames, methodContext);
+		var src = result.format();
+		eval(src);
+		return createUnit(name, smkSource, src, result.pack, result.funcNames, methodContext);
 	};
 })();
 },{"./compilers":48,"./smack/SmackLexer":51,"./smack/SmackParser":53,"./stdlib":55,"antlr4":41}],48:[function(require,module,exports){
@@ -12479,7 +12479,6 @@ module.exports = (function () {
 
 var SmackParser = require('./smack/SmackParser').SmackParser;
 var jsGenerators = require('./jsGenerators');
-var newCompileResult = require('./general').newCompileResult;
 
 module.exports = (function () {
 	return {
@@ -12508,89 +12507,89 @@ module.exports = (function () {
 			throw 'Unhandled resolvable';
 		},
 		compileKeyRef: function compileKeyRef(ctx, pack, methodContext) {
-			var resolvableSrc = this.compileResolvable(ctx.resolvable(0), pack, methodContext);
-			return jsGenerators.generateKeyRef(resolvableSrc);
+			var resolvablePart = this.compileResolvable(ctx.resolvable(0), pack, methodContext);
+			return jsGenerators.generateKeyRef(resolvablePart);
 		},
 		compileJsonPath: function compileJsonPath(ctx, pack, methodContext) {
 			var id = ctx.Id(0).getText();
-			var keyRefSrcs = [];
-			for (var i = 0; ctx.keyRef(i); i++) keyRefSrcs.push(this.compileKeyRef(ctx.keyRef(i), pack, methodContext));
-			return jsGenerators.generateJsonPath(id, keyRefSrcs);
+			var keyRefParts = [];
+			for (var i = 0; ctx.keyRef(i); i++) keyRefParts.push(this.compileKeyRef(ctx.keyRef(i), pack, methodContext));
+			return jsGenerators.generateJsonPath(id, keyRefParts);
 		},
 		compileExpression: function compileExpression(ctx, pack, methodContext) {
 			if (ctx instanceof SmackParser.AtomExprContext) return this.compileResolvable(ctx.resolvable(0), pack, methodContext);
 			if (ctx instanceof SmackParser.SignedExprContext) return jsGenerators.generateSignedExpr(this.compileExpression(ctx.expression(0), pack, methodContext));
 			if (ctx instanceof SmackParser.NotExprContext) return jsGenerators.generateNotExpr(this.compileExpression(ctx.expression(0), pack, methodContext));
 			if (ctx instanceof SmackParser.ParenExprContext) return jsGenerators.generateParenExpr(this.compileExpression(ctx.expression(0), pack, methodContext));
-			var expr1Src = this.compileExpression(ctx.expression(0), pack, methodContext);
-			var expr2Src = this.compileExpression(ctx.expression(1), pack, methodContext);
+			var expr1Part = this.compileExpression(ctx.expression(0), pack, methodContext);
+			var expr2Part = this.compileExpression(ctx.expression(1), pack, methodContext);
 			if (ctx instanceof SmackParser.SumExprContext) {
 				var isPos = true;
 				for (var i = 1; i < ctx.children.length; i++) {
 					var c = ctx.children[i];
 					if (c.symbol && c.symbol.type === SmackParser.Minus) isPos = !isPos;
 				}
-				if (isPos) return jsGenerators.generatePlusExpr(expr1Src, expr2Src);else return jsGenerators.generateMinusExpr(expr1Src, expr2Src);
+				if (isPos) return jsGenerators.generatePlusExpr(expr1Part, expr2Part);else return jsGenerators.generateMinusExpr(expr1Part, expr2Part);
 			}
 			if (ctx instanceof SmackParser.PowExprContext) {
-				if (ctx.expression(0) instanceof SmackParser.SignedExprContext) return jsGenerators.generateSignedPowExpr(this.compileExpression(ctx.expression(0).expression(0), pack, methodContext), expr2Src);
-				return jsGenerators.generatePowExpr(expr1Src, expr2Src);
+				if (ctx.expression(0) instanceof SmackParser.SignedExprContext) return jsGenerators.generateSignedPowExpr(this.compileExpression(ctx.expression(0).expression(0), pack, methodContext), expr2Part);
+				return jsGenerators.generatePowExpr(expr1Part, expr2Part);
 			}
-			if (ctx instanceof SmackParser.MulExprContext) return jsGenerators.generateMulExpr(expr1Src, expr2Src);
-			if (ctx instanceof SmackParser.DivExprContext) return jsGenerators.generateDivExpr(expr1Src, expr2Src);
-			if (ctx instanceof SmackParser.ModExprContext) return jsGenerators.generateModExpr(expr1Src, expr2Src);
-			if (ctx instanceof SmackParser.EqExprContext) return jsGenerators.generateEqExpr(expr1Src, expr2Src);
-			if (ctx instanceof SmackParser.NeqExprContext) return jsGenerators.generateNeqExpr(expr1Src, expr2Src);
-			if (ctx instanceof SmackParser.LtExprContext) return jsGenerators.generateLtExpr(expr1Src, expr2Src);
-			if (ctx instanceof SmackParser.LeExprContext) return jsGenerators.generateLeExpr(expr1Src, expr2Src);
-			if (ctx instanceof SmackParser.GtExprContext) return jsGenerators.generateGtExpr(expr1Src, expr2Src);
-			if (ctx instanceof SmackParser.GeExprContext) return jsGenerators.generateGeExpr(expr1Src, expr2Src);
-			if (ctx instanceof SmackParser.AndExprContext) return jsGenerators.generateAndExpr(expr1Src, expr2Src);
-			if (ctx instanceof SmackParser.OrExprContext) return jsGenerators.generateOrExpr(expr1Src, expr2Src);else throw 'Uhandled expression';
+			if (ctx instanceof SmackParser.MulExprContext) return jsGenerators.generateMulExpr(expr1Part, expr2Part);
+			if (ctx instanceof SmackParser.DivExprContext) return jsGenerators.generateDivExpr(expr1Part, expr2Part);
+			if (ctx instanceof SmackParser.ModExprContext) return jsGenerators.generateModExpr(expr1Part, expr2Part);
+			if (ctx instanceof SmackParser.EqExprContext) return jsGenerators.generateEqExpr(expr1Part, expr2Part);
+			if (ctx instanceof SmackParser.NeqExprContext) return jsGenerators.generateNeqExpr(expr1Part, expr2Part);
+			if (ctx instanceof SmackParser.LtExprContext) return jsGenerators.generateLtExpr(expr1Part, expr2Part);
+			if (ctx instanceof SmackParser.LeExprContext) return jsGenerators.generateLeExpr(expr1Part, expr2Part);
+			if (ctx instanceof SmackParser.GtExprContext) return jsGenerators.generateGtExpr(expr1Part, expr2Part);
+			if (ctx instanceof SmackParser.GeExprContext) return jsGenerators.generateGeExpr(expr1Part, expr2Part);
+			if (ctx instanceof SmackParser.AndExprContext) return jsGenerators.generateAndExpr(expr1Part, expr2Part);
+			if (ctx instanceof SmackParser.OrExprContext) return jsGenerators.generateOrExpr(expr1Part, expr2Part);else throw 'Uhandled expression';
 		},
 		compileVarAssign: function compileVarAssign(ctx, pack, methodContext) {
-			var jsonPathSrc = this.compileJsonPath(ctx.jsonPath(0), pack, methodContext);
-			var expressionSrc = this.compileExpression(ctx.expression(0), pack, methodContext);
-			return jsGenerators.generateVarAssign(jsonPathSrc, expressionSrc);
+			var jsonPathRes = this.compileJsonPath(ctx.jsonPath(0), pack, methodContext);
+			var expressionPart = this.compileExpression(ctx.expression(0), pack, methodContext);
+			return jsGenerators.generateVarAssign(jsonPathRes, expressionPart);
 		},
 		compileFuncInvoke: function compileFuncInvoke(ctx, pack, methodContext) {
 			var ids = this.getIds(ctx.dottedId(0));
-			var resolvableSrcs = [];
-			for (var i = 0; ctx.resolvable(i); i++) resolvableSrcs.push(this.compileResolvable(ctx.resolvable(i), pack, methodContext));
-			return jsGenerators.generateFuncInvoke(pack, ids, resolvableSrcs, methodContext);
+			var resolvableParts = [];
+			for (var i = 0; ctx.resolvable(i); i++) resolvableParts.push(this.compileResolvable(ctx.resolvable(i), pack, methodContext));
+			return jsGenerators.generateFuncInvoke(pack, ids, resolvableParts, methodContext);
 		},
 		compileRetStatement: function compileRetStatement(ctx, pack, methodContext) {
-			var expressionSrc = this.compileExpression(ctx.expression(0), pack, methodContext);
-			return jsGenerators.generateRetStatement(expressionSrc);
+			var expressionPart = this.compileExpression(ctx.expression(0), pack, methodContext);
+			return jsGenerators.generateRetStatement(expressionPart);
 		},
 		compileStatement: function compileStatement(ctx, pack, methodContext) {
 			var statement = ctx.children[0];
-			var src;
-			if (statement instanceof SmackParser.VarAssignContext) src = this.compileVarAssign(statement, pack, methodContext);else if (statement instanceof SmackParser.FuncInvokeContext) src = this.compileFuncInvoke(statement, pack, methodContext);else if (statement instanceof SmackParser.RetStatementContext) src = this.compileRetStatement(statement, pack, methodContext);
-			return jsGenerators.generateClosedStatement(src);
+			var result;
+			if (statement instanceof SmackParser.VarAssignContext) result = this.compileVarAssign(statement, pack, methodContext);else if (statement instanceof SmackParser.FuncInvokeContext) result = this.compileFuncInvoke(statement, pack, methodContext);else if (statement instanceof SmackParser.RetStatementContext) result = this.compileRetStatement(statement, pack, methodContext);
+			return jsGenerators.generateClosedStatement(result);
 		},
 		compileLoop: function compileLoop(ctx, pack, methodContext) {
-			var expressionSrc = this.compileExpression(ctx.expression(0), pack, methodContext);
-			var codeBlockSrc = this.compileCodeBlock(ctx.codeBlock(0), pack, methodContext);
-			return jsGenerators.generateLoop(expressionSrc, codeBlockSrc);
+			var expressionPart = this.compileExpression(ctx.expression(0), pack, methodContext);
+			var codeBlockPart = this.compileCodeBlock(ctx.codeBlock(0), pack, methodContext);
+			return jsGenerators.generateLoop(expressionPart, codeBlockPart);
 		},
 		compileElseStat: function compileElseStat(ctx, pack, methodContext) {
-			var codeBlockSrc = this.compileCodeBlock(ctx.codeBlock(0), pack, methodContext);
-			return jsGenerators.generateElseStat(codeBlockSrc);
+			var codeBlockPart = this.compileCodeBlock(ctx.codeBlock(0), pack, methodContext);
+			return jsGenerators.generateElseStat(codeBlockPart);
 		},
 		compileElseIfStat: function compileElseIfStat(ctx, pack, methodContext) {
-			var expressionSrc = this.compileExpression(ctx.expression(0), pack, methodContext);
-			var codeBlockSrc = this.compileCodeBlock(ctx.codeBlock(0), pack, methodContext);
-			return jsGenerators.generateElseIfStat(expressionSrc, codeBlockSrc);
+			var expressionPart = this.compileExpression(ctx.expression(0), pack, methodContext);
+			var codeBlockPart = this.compileCodeBlock(ctx.codeBlock(0), pack, methodContext);
+			return jsGenerators.generateElseIfStat(expressionPart, codeBlockPart);
 		},
 		compileIfStat: function compileIfStat(ctx, pack, methodContext) {
-			var expressionSrc = this.compileExpression(ctx.expression(0), pack, methodContext);
-			var codeBlockSrc = this.compileCodeBlock(ctx.codeBlock(0), pack, methodContext);
-			var elseifStatSrcs = [];
-			for (var i = 0; ctx.elseIfStat(i); i++) elseifStatSrcs.push(this.compileElseIfStat(ctx.elseIfStat(i), pack, methodContext));
-			var elseStatSrc = '';
-			if (ctx.elseStat(0)) elseStatSrc = this.compileElseStat(ctx.elseStat(0), pack, methodContext);
-			return jsGenerators.generateIfStat(expressionSrc, codeBlockSrc, elseifStatSrcs, elseStatSrc);
+			var expressionPart = this.compileExpression(ctx.expression(0), pack, methodContext);
+			var codeBlockPart = this.compileCodeBlock(ctx.codeBlock(0), pack, methodContext);
+			var elseifStatParts = [];
+			for (var i = 0; ctx.elseIfStat(i); i++) elseifStatParts.push(this.compileElseIfStat(ctx.elseIfStat(i), pack, methodContext));
+			var elseStatPart = '';
+			if (ctx.elseStat(0)) elseStatPart = this.compileElseStat(ctx.elseStat(0), pack, methodContext);
+			return jsGenerators.generateIfStat(expressionPart, codeBlockPart, elseifStatParts, elseStatPart);
 		},
 		compileSentence: function compileSentence(ctx, pack, methodContext) {
 			var sentence = ctx.children[0];
@@ -12599,189 +12598,261 @@ module.exports = (function () {
 			return src;
 		},
 		compileCodeBlock: function compileCodeBlock(ctx, pack, methodContext) {
-			var sentenceSrcs = [];
-			for (var i = 0; ctx.sentence(i); i++) sentenceSrcs.push(this.compileSentence(ctx.sentence(i), pack, methodContext));
-			return jsGenerators.generateCodeBlock(sentenceSrcs);
+			var sentenceParts = [];
+			for (var i = 0; ctx.sentence(i); i++) sentenceParts.push(this.compileSentence(ctx.sentence(i), pack, methodContext));
+			return jsGenerators.generateCodeBlock(sentenceParts);
 		},
 		compileFuncDecl: function compileFuncDecl(ctx, pack, methodContext) {
-			var codeBlockSrc;
+			var codeBlockPart;
 			var ids = [];
 
 			for (var i = 0; i < ctx.children.length; i++) {
 				var c = ctx.children[i];
-				if (c.symbol && c.symbol.type === SmackParser.Id) ids.push(c.getText());else if (c instanceof SmackParser.CodeBlockContext) codeBlockSrc = this.compileCodeBlock(c, pack, methodContext);
+				if (c.symbol && c.symbol.type === SmackParser.Id) ids.push(c.getText());else if (c instanceof SmackParser.CodeBlockContext) codeBlockPart = this.compileCodeBlock(c, pack, methodContext);
 			}
-			return jsGenerators.generateFuncDecl(pack, ids, codeBlockSrc, methodContext);
+			return jsGenerators.generateFuncDecl(pack, ids, codeBlockPart, methodContext);
 		},
 		compileSmkFile: function compileSmkFile(ctx, methodContext) {
 			var pack = this.compilePackageDecl(ctx.packageDecl(0));
 			var funcNames = [];
-			var funcDeclSrcs = [];
+			var funcDeclParts = [];
 			for (var i = 0; i < ctx.children.length; i++) {
 				var c = ctx.children[i];
 				if (c instanceof SmackParser.FuncDeclContext) {
-					funcDeclSrcs.push(this.compileFuncDecl(c, pack, methodContext));
+					funcDeclParts.push(this.compileFuncDecl(c, pack, methodContext));
 					funcNames.push(c.Id(0).getText());
 				}
 			}
-			var smkFileResult = jsGenerators.generateSmkFile(funcDeclSrcs, methodContext);
-			smkFileResult.pack = pack;
+			var smkFileResult = jsGenerators.generateSmkFile(funcDeclParts, methodContext);
+			smkFileResult.pack = pack.format();
 			smkFileResult.funcNames = funcNames;
 			smkFileResult.methodContext = methodContext;
 			return smkFileResult;
 		}
 	};
 })();
-},{"./general":49,"./jsGenerators":50,"./smack/SmackParser":53}],49:[function(require,module,exports){
-"use strict";
+},{"./jsGenerators":50,"./smack/SmackParser":53}],49:[function(require,module,exports){
+'use strict';
 
 module.exports = {
-	newCompileResult: function newCompileResult(src, childResults) {
-		var vars;
-		if (childResults != null) {
-			if (childResults.src) vars = childResults.vars ? childResults.vars : [];else {
-				vars = [];
-				for (var i = 0; childResults != null && i < childResults.length; i++) vars.concat(childResults[i].vars);
+	newCompileResult: function newCompileResult() {
+		var set = function set(key, value) {
+			this[key] = value;
+			return this;
+		};
+
+		var add = function add() {
+			var key = arguments[0];
+			if (arguments.length > 1 && !this[key]) this[key] = [];
+			for (var i = 1; i < arguments.length; i++) {
+				if (!arguments[i]) continue;
+				if (Array.isArray(arguments[i])) this.add.apply(this, [key].concat(arguments[i]));else this[key].push(arguments[i]);
+
+				if (typeof arguments[i] === 'object') moveParentScopeUpstream(this, arguments[i]);
 			}
+			return this;
+		};
+
+		var newParentScope = function newParentScope() {
+			return { set: set, add: add };
+		};
+
+		var getParentScope = function getParentScope(ctx, type) {
+			if (!ctx._parentScopes) ctx._parentScopes = {};
+			if (!ctx._parentScopes[type]) ctx._parentScopes[type] = newParentScope();
+			return ctx._parentScopes[type];
+		};
+
+		var moveParentScopeUpstream = function moveParentScopeUpstream(parent, child) {
+			var pcs = child._parentScopes;
+			if (!pcs) return;
+
+			for (var type in pcs) {
+				if (type === parent.type) copyAll(pcs[type], parent);else copyAll(pcs[type], getParentScope(parent, type));
+			}
+			child._parentScopes = null;
+		};
+
+		var copyAll = function copyAll(from, to) {
+			for (var key in from) {
+				if (to.hasOwnProperty(key)) {
+					if (Array.isArray(to[key])) to[key] = to[key].concat(from[key]);
+				} else to[key] = from[key];
+			}
+		};
+
+		return {
+			set: set,
+			add: add,
+			setToParent: function setToParent() {
+				if (arguments.length < 2) return;
+				var pc = getParentScope(this, arguments[0]);
+				pc.set(arguments[1], arguments[2]);
+			},
+			addToParent: function addToParent() {
+				var args = Array.from(arguments);
+				if (args.length < 2) return;
+				var pc = getParentScope(this, args[0]);
+				pc.add.apply(pc, args.slice(1));
+			},
+			format: function format() {
+				var src = '';
+				if (this.parts) for (var i = 0; i < this.parts.length; i++) src += typeof this.parts[i] === 'string' ? this.parts[i] : this.parts[i].format();
+				return src;
+			}
+		};
+	},
+	join: function join(ary, w) {
+		var res = [];
+		for (var i = 0; i < ary.length; i++) {
+			res.push(ary[i]);
+			if (i < ary.length - 1) res.push(w);
 		}
-		return { src: src, vars: vars };
+		return res;
 	}
 };
 },{}],50:[function(require,module,exports){
 'use strict';
 
-var newCompileResult = require('./general').newCompileResult;
+var g = require('./general');
+var ncr = require('./general').newCompileResult;
 
 module.exports = (function () {
 	return {
 		generateDottedId: function generateDottedId(ids) {
-			return ids.join('.');
+			return ncr().add('parts', g.join(ids, '.'));
 		},
 		generatePackageDecl: function generatePackageDecl(ids) {
-			return ids.join('.');
+			return this.generateDottedId(ids);
 		},
 		generateComment: function generateComment(str) {
 			return ' '; //'// ' + str + '\n';
 		},
-		generateClosedStatement: function generateClosedStatement(openStatSrc) {
-			openStatSrc.src += ';';
-			return openStatSrc;
+		generateClosedStatement: function generateClosedStatement(openStatPart) {
+			return ncr().add('parts', openStatPart, ';');
 		},
-		generateVarAssign: function generateVarAssign(jsonPathSrc, expressionSrc) {
-			return jsonPathSrc + '=' + expressionSrc;
+		generateVarDecl: function generateVarDecl(jsonPathPart) {
+			return ncr().add('parts', 'var ', jsonPathPart, ';');
+		},
+		generateVarDecls: function generateVarDecls(jsonPathParts, ids) {
+			if (!jsonPathParts || jsonPathParts.length === 0) return '';
+			var cr = ncr();
+			var idMap = {};
+			for (var i = 0; i < ids; i++) idMap[ids[i]] = true;
+			for (var i = 0; i < jsonPathParts.length; i++) {
+				var name = jsonPathParts[i].format();
+				if (!idMap[name]) cr.add('parts', 'var ', name, ';');
+			}
+			return cr;
+		},
+		generateVarAssign: function generateVarAssign(jsonPathPart, expressionPart) {
+			var cr = ncr().add('parts', jsonPathPart, '=', expressionPart);
+			if (jsonPathPart.isSimple) cr.addToParent('funcDecl', 'varDecl', jsonPathPart);
+			return cr;
 		},
 		generateValue: function generateValue(valueStr) {
 			return valueStr;
 		},
-		generateKeyRef: function generateKeyRef(resolvableSrc) {
-			return '[' + resolvableSrc + ']';
+		generateKeyRef: function generateKeyRef(resolvablePart) {
+			return ncr().add('parts', '[', resolvablePart, ']');
 		},
-		generateJsonPath: function generateJsonPath(id, keyRefSrcs) {
-			var src = id;
-			for (var i = 0; i < keyRefSrcs.length; i++) src += keyRefSrcs[i];
-			return src;
+		generateJsonPath: function generateJsonPath(id, keyRefParts) {
+			return ncr().set('isSimple', keyRefParts.length === 0).add('parts', id, keyRefParts);
 		},
-		generateSignedExpr: function generateSignedExpr(expressionSrc) {
-			return '-' + expressionSrc;
+		generateSignedExpr: function generateSignedExpr(expressionPart) {
+			return ncr().add('parts', '-', expressionPart);
 		},
-		generateNotExpr: function generateNotExpr(expressionSrc) {
-			return '!' + expressionSrc;
+		generateNotExpr: function generateNotExpr(expressionPart) {
+			return ncr().add('parts', '!', expressionPart);
 		},
-		generateParenExpr: function generateParenExpr(expressionSrc) {
-			return '(' + expressionSrc + ')';
+		generateParenExpr: function generateParenExpr(expressionPart) {
+			return ncr().add('parts', '(', expressionPart, ')');
 		},
-		generatePlusExpr: function generatePlusExpr(expr1Src, expr2Src) {
-			return expr1Src + ' + ' + expr2Src;
+		generatePlusExpr: function generatePlusExpr(expr1Part, expr2Part) {
+			return ncr().add('parts', expr1Part, ' + ', expr2Part);
 		},
-		generateMinusExpr: function generateMinusExpr(expr1Src, expr2Src) {
-			return expr1Src + ' - ' + expr2Src;
+		generateMinusExpr: function generateMinusExpr(expr1Part, expr2Part) {
+			return ncr().add('parts', expr1Part, ' - ', expr2Part);
 		},
-		generateMulExpr: function generateMulExpr(expr1Src, expr2Src) {
-			return expr1Src + ' * ' + expr2Src;
+		generateMulExpr: function generateMulExpr(expr1Part, expr2Part) {
+			return ncr().add('parts', expr1Part, ' * ', expr2Part);
 		},
-		generateDivExpr: function generateDivExpr(expr1Src, expr2Src) {
-			return expr1Src + ' / ' + expr2Src;
+		generateDivExpr: function generateDivExpr(expr1Part, expr2Part) {
+			return ncr().add('parts', expr1Part, ' / ', expr2Part);
 		},
-		generateModExpr: function generateModExpr(expr1Src, expr2Src) {
-			return expr1Src + ' % ' + expr2Src;
+		generateModExpr: function generateModExpr(expr1Part, expr2Part) {
+			return ncr().add('parts', expr1Part, ' % ', expr2Part);
 		},
-		generatePowExpr: function generatePowExpr(expr1Src, expr2Src) {
-			return 'Math.pow(' + expr1Src + ', ' + expr2Src + ')';
+		generatePowExpr: function generatePowExpr(expr1Part, expr2Part) {
+			return ncr().add('parts', 'Math.pow(', expr1Part, ', ', expr2Part, ')');
 		},
-		generateSignedPowExpr: function generateSignedPowExpr(expr1Src, expr2Src) {
-			return '-Math.pow(' + expr1Src + ', ' + expr2Src + ')';
+		generateSignedPowExpr: function generateSignedPowExpr(expr1Part, expr2Part) {
+			return ncr().add('parts', '-Math.pow(', expr1Part, ', ', expr2Part, ')');
 		},
-		generateEqExpr: function generateEqExpr(expr1Src, expr2Src) {
-			return expr1Src + ' === ' + expr2Src;
+		generateEqExpr: function generateEqExpr(expr1Part, expr2Part) {
+			return ncr().add('parts', expr1Part, ' === ', expr2Part);
 		},
-		generateNeqExpr: function generateNeqExpr(expr1Src, expr2Src) {
-			return expr1Src + ' !== ' + expr2Src;
+		generateNeqExpr: function generateNeqExpr(expr1Part, expr2Part) {
+			return ncr().add('parts', expr1Part, ' !== ', expr2Part);
 		},
-		generateLtExpr: function generateLtExpr(expr1Src, expr2Src) {
-			return expr1Src + ' < ' + expr2Src;
+		generateLtExpr: function generateLtExpr(expr1Part, expr2Part) {
+			return ncr().add('parts', expr1Part, ' < ', expr2Part);
 		},
-		generateLeExpr: function generateLeExpr(expr1Src, expr2Src) {
-			return expr1Src + ' <= ' + expr2Src;
+		generateLeExpr: function generateLeExpr(expr1Part, expr2Part) {
+			return ncr().add('parts', expr1Part, ' <= ', expr2Part);
 		},
-		generateGtExpr: function generateGtExpr(expr1Src, expr2Src) {
-			return expr1Src + ' > ' + expr2Src;
+		generateGtExpr: function generateGtExpr(expr1Part, expr2Part) {
+			return ncr().add('parts', expr1Part, ' > ', expr2Part);
 		},
-		generateGeExpr: function generateGeExpr(expr1Src, expr2Src) {
-			return expr1Src + ' >= ' + expr2Src;
+		generateGeExpr: function generateGeExpr(expr1Part, expr2Part) {
+			return ncr().add('parts', expr1Part, ' >= ', expr2Part);
 		},
-		generateAndExpr: function generateAndExpr(expr1Src, expr2Src) {
-			return expr1Src + ' && ' + expr2Src;
+		generateAndExpr: function generateAndExpr(expr1Part, expr2Part) {
+			return ncr().add('parts', expr1Part, ' && ', expr2Part);
 		},
-		generateOrExpr: function generateOrExpr(expr1Src, expr2Src) {
-			return expr1Src + ' || ' + expr2Src;
+		generateOrExpr: function generateOrExpr(expr1Part, expr2Part) {
+			return ncr().add('parts', expr1Part, ' || ', expr2Part);
 		},
-		generateFuncInvoke: function generateFuncInvoke(pack, ids, resolvableSrcs, methodContext) {
-			var src = '';
-			if (ids.length > 1) src += 'methodContext.' + ids.slice(0, ids.length - 1).join('.') + '._f.' + ids[ids.length - 1];else if (methodContext._f[ids[0]]) src += 'methodContext._f.' + ids[0];else src += 'methodContext.' + pack + '._f.' + ids[0];
-			src += '(' + resolvableSrcs.join(', ') + ')';
-			return src;
+		generateFuncInvoke: function generateFuncInvoke(pack, ids, resolvableParts, methodContext) {
+			var cr = ncr().add('parts', 'methodContext.');
+			if (ids.length > 1) cr.add('parts', g.join(ids.slice(0, ids.length - 1), '.'), '._f.', ids[ids.length - 1]);else if (methodContext._f[ids[0]]) cr.add('parts', '_f.', ids[0]);else cr.add('parts', pack, '._f.', ids[0]);
+			cr.add('parts', '(', g.join(resolvableParts, ', '), ')');
+			return cr;
 		},
-		generateRetStatement: function generateRetStatement(expressionSrc) {
-			return 'return ' + expressionSrc;
+		generateRetStatement: function generateRetStatement(expressionPart) {
+			return ncr().add('parts', 'return ', expressionPart);
 		},
-		generateLoop: function generateLoop(expressionSrc, codeBlockSrc) {
-			return 'while' + '(' + expressionSrc + ')' + codeBlockSrc;
+		generateLoop: function generateLoop(expressionPart, codeBlockPart) {
+			return ncr().add('parts', 'while', '(', expressionPart, ')', codeBlockPart);
 		},
-		generateElseStat: function generateElseStat(codeBlockSrc) {
-			return 'else' + codeBlockSrc;
+		generateElseStat: function generateElseStat(codeBlockPart) {
+			return ncr().add('parts', 'else', codeBlockPart);
 		},
-		generateElseIfStat: function generateElseIfStat(expressionSrc, codeBlockSrc) {
-			return 'else if' + '(' + expressionSrc + ')' + codeBlockSrc;
+		generateElseIfStat: function generateElseIfStat(expressionPart, codeBlockPart) {
+			return ncr().add('parts', 'else if', '(', expressionPart, ')', codeBlockPart);
 		},
-		generateIfStat: function generateIfStat(expressionSrc, codeBlockSrc, elseifStatSrcs, elseStat) {
-			var src = 'if' + '(' + expressionSrc + ')' + codeBlockSrc;
-			for (var i = 0; i < elseifStatSrcs.length; i++) src += elseifStatSrcs[i];
-			if (elseStat) src += elseStat;
-			return src;
+		generateIfStat: function generateIfStat(expressionPart, codeBlockPart, elseifStatParts, elseStat) {
+			var cr = ncr().add('parts', 'if', '(', expressionPart, ')', codeBlockPart, elseifStatParts);
+			if (elseStat) cr.add('parts', elseStat);
+			return cr;
 		},
 		generateCodeBlock: function generateCodeBlock(sentenceSources) {
-			var source = '{';
-			for (var i = 0; i < sentenceSources.length; i++) source += sentenceSources[i];
-			source += '}\n';
-			return source;
+			var cr = ncr().add('parts', '{', sentenceSources, '}\n');
+			cr.addVarDecls = function () {
+				this.parts = ['{'].concat(Array.from(arguments)).concat(this.parts.slice(1));
+			};
+			return cr;
 		},
-		generateFuncDecl: function generateFuncDecl(pack, ids, codeBlockSrc, methodContext) {
-			var funcPath = pack + '._f.' + ids[0];
-			eval('if(methodContext.' + pack + ' && methodContext.' + funcPath + ') throw "the function ' + funcPath + ' already exists";');
-			var source = funcPath + ' = function(';
-			var isFirst = true;
-			for (var i = 1; i < ids.length; i++) {
-				if (!isFirst) source += ', ';
-				source += ids[i];
-				isFirst = false;
-			}
-			source += ')' + codeBlockSrc;
-			return source;
+		generateFuncDecl: function generateFuncDecl(pack, ids, codeBlockPart, methodContext) {
+			var funcPath = ncr().add('parts', pack, '._f.', ids[0]);
+			eval(ncr().add('parts', 'if(methodContext.', pack, ' && methodContext.', funcPath, ') throw "the function ', funcPath, ' already exists";').format());
+			var cr = ncr().set('type', 'funcDecl').add('parts', codeBlockPart);
+			codeBlockPart.addVarDecls(this.generateVarDecls(cr.varDecl, ids));
+			cr = ncr().add('parts', funcPath, ' = function(', g.join(ids.slice(1), ', '), ')', codeBlockPart);
+			return cr;
 		},
-		generateSmkFile: function generateSmkFile(funcDeclSrcs, methodContext) {
-			var src = '';
-			for (var i = 0; i < funcDeclSrcs.length; i++) src += 'methodContext.' + funcDeclSrcs[i];
-			return newCompileResult(src);
+		generateSmkFile: function generateSmkFile(funcDeclParts, methodContext) {
+			return ncr().add('parts', 'methodContext.', g.join(funcDeclParts, 'methodContext.'));
 		}
 	};
 })();

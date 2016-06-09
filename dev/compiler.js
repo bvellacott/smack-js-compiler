@@ -45,9 +45,9 @@ module.exports = (function(){
 	return function(name, smkSource, methodContext) {
 		var tree = getParseTree(smkSource);
 		initMethodContext(tree, methodContext);
-		var pack = compilers.compilePackageDecl(tree.packageDecl(0));
 		var result = compilers.compileSmkFile(tree, methodContext)
-		eval(result.src);
-		return createUnit(name, smkSource, result.src, pack, result.funcNames, methodContext);
+		var src = result.format();
+		eval(src);
+		return createUnit(name, smkSource, src, result.pack, result.funcNames, methodContext);
 	};
 })();

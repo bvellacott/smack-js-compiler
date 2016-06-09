@@ -1,6 +1,5 @@
 var SmackParser = require('./smack/SmackParser').SmackParser;
 var jsGenerators = require('./jsGenerators');
-var newCompileResult = require('./general').newCompileResult;
 
 module.exports = (function(){
 	return {
@@ -33,15 +32,15 @@ module.exports = (function(){
 			throw 'Unhandled resolvable';
 		},
 		compileKeyRef : function(ctx, pack, methodContext) {
-			var resolvableSrc = this.compileResolvable(ctx.resolvable(0), pack, methodContext);
-			return jsGenerators.generateKeyRef(resolvableSrc);
+			var resolvablePart = this.compileResolvable(ctx.resolvable(0), pack, methodContext);
+			return jsGenerators.generateKeyRef(resolvablePart);
 		},
 		compileJsonPath : function(ctx, pack, methodContext) {
 			var id = ctx.Id(0).getText();
-			var keyRefSrcs = [];
+			var keyRefParts = [];
 			for(var i = 0; ctx.keyRef(i); i++)
-				keyRefSrcs.push(this.compileKeyRef(ctx.keyRef(i), pack, methodContext));
-			return jsGenerators.generateJsonPath(id, keyRefSrcs);
+				keyRefParts.push(this.compileKeyRef(ctx.keyRef(i), pack, methodContext));
+			return jsGenerators.generateJsonPath(id, keyRefParts);
 		},
 		compileExpression : function(ctx, pack, methodContext) {
 			if(ctx instanceof SmackParser.AtomExprContext)
@@ -52,8 +51,8 @@ module.exports = (function(){
 				return jsGenerators.generateNotExpr(this.compileExpression(ctx.expression(0), pack, methodContext));
 			if(ctx instanceof SmackParser.ParenExprContext)
 				return jsGenerators.generateParenExpr(this.compileExpression(ctx.expression(0), pack, methodContext));
-			var expr1Src = this.compileExpression(ctx.expression(0), pack, methodContext);
-			var expr2Src = this.compileExpression(ctx.expression(1), pack, methodContext);
+			var expr1Part = this.compileExpression(ctx.expression(0), pack, methodContext);
+			var expr2Part = this.compileExpression(ctx.expression(1), pack, methodContext);
 			if(ctx instanceof SmackParser.SumExprContext) {
 				var isPos = true;
 				for(var i = 1; i < ctx.children.length; i++) {
@@ -62,91 +61,91 @@ module.exports = (function(){
 						isPos = !isPos;
 				}
 				if(isPos)
-					return jsGenerators.generatePlusExpr(expr1Src, expr2Src);
+					return jsGenerators.generatePlusExpr(expr1Part, expr2Part);
 				else
-					return jsGenerators.generateMinusExpr(expr1Src, expr2Src);
+					return jsGenerators.generateMinusExpr(expr1Part, expr2Part);
 			}
 			if(ctx instanceof SmackParser.PowExprContext) {
 				if(ctx.expression(0) instanceof SmackParser.SignedExprContext)
-					return jsGenerators.generateSignedPowExpr(this.compileExpression(ctx.expression(0).expression(0), pack, methodContext), expr2Src);
-				return jsGenerators.generatePowExpr(expr1Src, expr2Src);
+					return jsGenerators.generateSignedPowExpr(this.compileExpression(ctx.expression(0).expression(0), pack, methodContext), expr2Part);
+				return jsGenerators.generatePowExpr(expr1Part, expr2Part);
 			}
 			if(ctx instanceof SmackParser.MulExprContext)
-				return jsGenerators.generateMulExpr(expr1Src, expr2Src);
+				return jsGenerators.generateMulExpr(expr1Part, expr2Part);
 			if(ctx instanceof SmackParser.DivExprContext)
-				return jsGenerators.generateDivExpr(expr1Src, expr2Src);
+				return jsGenerators.generateDivExpr(expr1Part, expr2Part);
 			if(ctx instanceof SmackParser.ModExprContext)
-				return jsGenerators.generateModExpr(expr1Src, expr2Src);
+				return jsGenerators.generateModExpr(expr1Part, expr2Part);
 			if(ctx instanceof SmackParser.EqExprContext)
-				return jsGenerators.generateEqExpr(expr1Src, expr2Src);
+				return jsGenerators.generateEqExpr(expr1Part, expr2Part);
 			if(ctx instanceof SmackParser.NeqExprContext)
-				return jsGenerators.generateNeqExpr(expr1Src, expr2Src);
+				return jsGenerators.generateNeqExpr(expr1Part, expr2Part);
 			if(ctx instanceof SmackParser.LtExprContext)
-				return jsGenerators.generateLtExpr(expr1Src, expr2Src);
+				return jsGenerators.generateLtExpr(expr1Part, expr2Part);
 			if(ctx instanceof SmackParser.LeExprContext)
-				return jsGenerators.generateLeExpr(expr1Src, expr2Src);
+				return jsGenerators.generateLeExpr(expr1Part, expr2Part);
 			if(ctx instanceof SmackParser.GtExprContext)
-				return jsGenerators.generateGtExpr(expr1Src, expr2Src);
+				return jsGenerators.generateGtExpr(expr1Part, expr2Part);
 			if(ctx instanceof SmackParser.GeExprContext)
-				return jsGenerators.generateGeExpr(expr1Src, expr2Src);
+				return jsGenerators.generateGeExpr(expr1Part, expr2Part);
 			if(ctx instanceof SmackParser.AndExprContext)
-				return jsGenerators.generateAndExpr(expr1Src, expr2Src);
+				return jsGenerators.generateAndExpr(expr1Part, expr2Part);
 			if(ctx instanceof SmackParser.OrExprContext)
-				return jsGenerators.generateOrExpr(expr1Src, expr2Src);
+				return jsGenerators.generateOrExpr(expr1Part, expr2Part);
 			else
 				throw 'Uhandled expression';
 		},
 		compileVarAssign : function(ctx, pack, methodContext) {
-			var jsonPathSrc = this.compileJsonPath(ctx.jsonPath(0), pack, methodContext);
-			var expressionSrc = this.compileExpression(ctx.expression(0), pack, methodContext);
-			return jsGenerators.generateVarAssign(jsonPathSrc, expressionSrc);
+			var jsonPathRes = this.compileJsonPath(ctx.jsonPath(0), pack, methodContext);
+			var expressionPart = this.compileExpression(ctx.expression(0), pack, methodContext);
+			return jsGenerators.generateVarAssign(jsonPathRes, expressionPart);
 		},
 		compileFuncInvoke : function(ctx, pack, methodContext) {
 			var ids = this.getIds(ctx.dottedId(0));
-			var resolvableSrcs = [];
+			var resolvableParts = [];
 			for(var i = 0; ctx.resolvable(i); i++)
-				resolvableSrcs.push(this.compileResolvable(ctx.resolvable(i), pack, methodContext));
-			return jsGenerators.generateFuncInvoke(pack, ids, resolvableSrcs, methodContext);
+				resolvableParts.push(this.compileResolvable(ctx.resolvable(i), pack, methodContext));
+			return jsGenerators.generateFuncInvoke(pack, ids, resolvableParts, methodContext);
 		},
 		compileRetStatement : function(ctx, pack, methodContext) {
-			var expressionSrc = this.compileExpression(ctx.expression(0), pack, methodContext);
-			return jsGenerators.generateRetStatement(expressionSrc);
+			var expressionPart = this.compileExpression(ctx.expression(0), pack, methodContext);
+			return jsGenerators.generateRetStatement(expressionPart);
 		},
 		compileStatement : function(ctx, pack, methodContext) {
 			var statement = ctx.children[0];
-			var src;
+			var result;
 			if(statement instanceof SmackParser.VarAssignContext)
-				src = this.compileVarAssign(statement, pack, methodContext);
+				result = this.compileVarAssign(statement, pack, methodContext);
 			else if(statement instanceof SmackParser.FuncInvokeContext)
-				src = this.compileFuncInvoke(statement, pack, methodContext);
+				result = this.compileFuncInvoke(statement, pack, methodContext);
 			else if(statement instanceof SmackParser.RetStatementContext)
-				src = this.compileRetStatement(statement, pack, methodContext);
-			return jsGenerators.generateClosedStatement(src);
+				result = this.compileRetStatement(statement, pack, methodContext);
+			return jsGenerators.generateClosedStatement(result);
 		},
 		compileLoop : function(ctx, pack, methodContext) {
-			var expressionSrc = this.compileExpression(ctx.expression(0), pack, methodContext);
-			var codeBlockSrc = this.compileCodeBlock(ctx.codeBlock(0), pack, methodContext);
-			return jsGenerators.generateLoop(expressionSrc, codeBlockSrc);
+			var expressionPart = this.compileExpression(ctx.expression(0), pack, methodContext);
+			var codeBlockPart = this.compileCodeBlock(ctx.codeBlock(0), pack, methodContext);
+			return jsGenerators.generateLoop(expressionPart, codeBlockPart);
 		},
 		compileElseStat : function(ctx, pack, methodContext) {
-			var codeBlockSrc = this.compileCodeBlock(ctx.codeBlock(0), pack, methodContext);
-			return jsGenerators.generateElseStat(codeBlockSrc);
+			var codeBlockPart = this.compileCodeBlock(ctx.codeBlock(0), pack, methodContext);
+			return jsGenerators.generateElseStat(codeBlockPart);
 		},
 		compileElseIfStat : function(ctx, pack, methodContext) {
-			var expressionSrc = this.compileExpression(ctx.expression(0), pack, methodContext);
-			var codeBlockSrc = this.compileCodeBlock(ctx.codeBlock(0), pack, methodContext);
-			return jsGenerators.generateElseIfStat(expressionSrc, codeBlockSrc);
+			var expressionPart = this.compileExpression(ctx.expression(0), pack, methodContext);
+			var codeBlockPart = this.compileCodeBlock(ctx.codeBlock(0), pack, methodContext);
+			return jsGenerators.generateElseIfStat(expressionPart, codeBlockPart);
 		},
 		compileIfStat : function(ctx, pack, methodContext) {
-			var expressionSrc = this.compileExpression(ctx.expression(0), pack, methodContext);
-			var codeBlockSrc = this.compileCodeBlock(ctx.codeBlock(0), pack, methodContext);
-			var elseifStatSrcs = [];
+			var expressionPart = this.compileExpression(ctx.expression(0), pack, methodContext);
+			var codeBlockPart = this.compileCodeBlock(ctx.codeBlock(0), pack, methodContext);
+			var elseifStatParts = [];
 			for(var i = 0; ctx.elseIfStat(i); i++)
-				elseifStatSrcs.push(this.compileElseIfStat(ctx.elseIfStat(i), pack, methodContext));
-			var elseStatSrc = '';
+				elseifStatParts.push(this.compileElseIfStat(ctx.elseIfStat(i), pack, methodContext));
+			var elseStatPart = '';
 			if(ctx.elseStat(0))
-				elseStatSrc = this.compileElseStat(ctx.elseStat(0), pack, methodContext);
-			return jsGenerators.generateIfStat(expressionSrc, codeBlockSrc, elseifStatSrcs, elseStatSrc);
+				elseStatPart = this.compileElseStat(ctx.elseStat(0), pack, methodContext);
+			return jsGenerators.generateIfStat(expressionPart, codeBlockPart, elseifStatParts, elseStatPart);
 		},
 		compileSentence : function(ctx, pack, methodContext) {
 			var sentence = ctx.children[0];
@@ -160,13 +159,13 @@ module.exports = (function(){
 			return src;
 		},
 		compileCodeBlock : function(ctx, pack, methodContext) {
-			var sentenceSrcs = [];
+			var sentenceParts = [];
 			for(var i = 0; ctx.sentence(i); i++)
-				sentenceSrcs.push(this.compileSentence(ctx.sentence(i), pack, methodContext));
-			return jsGenerators.generateCodeBlock(sentenceSrcs);
+				sentenceParts.push(this.compileSentence(ctx.sentence(i), pack, methodContext));
+			return jsGenerators.generateCodeBlock(sentenceParts);
 		},
 		compileFuncDecl : function(ctx, pack, methodContext) {
-			var codeBlockSrc 
+			var codeBlockPart 
 			var ids = [];
 			
 			for(var i = 0; i < ctx.children.length; i++) {
@@ -174,23 +173,23 @@ module.exports = (function(){
 				if(c.symbol && c.symbol.type === SmackParser.Id)
 					ids.push(c.getText());
 				else if(c instanceof SmackParser.CodeBlockContext)
-					codeBlockSrc = this.compileCodeBlock(c, pack, methodContext);
+					codeBlockPart = this.compileCodeBlock(c, pack, methodContext);
 			}
-			return jsGenerators.generateFuncDecl(pack, ids, codeBlockSrc, methodContext);
+			return jsGenerators.generateFuncDecl(pack, ids, codeBlockPart, methodContext);
 		},
 		compileSmkFile : function(ctx, methodContext) {
 			var pack = this.compilePackageDecl(ctx.packageDecl(0));
 			var funcNames = [];
-			var funcDeclSrcs = [];
+			var funcDeclParts = [];
 			for(var i = 0; i < ctx.children.length; i++) {
 				var c = ctx.children[i];
 				if(c instanceof SmackParser.FuncDeclContext) {
-					funcDeclSrcs.push(this.compileFuncDecl(c, pack, methodContext));
+					funcDeclParts.push(this.compileFuncDecl(c, pack, methodContext));
 					funcNames.push(c.Id(0).getText());
 				}
 			}
-			var smkFileResult = jsGenerators.generateSmkFile(funcDeclSrcs, methodContext);
-			smkFileResult.pack = pack;
+			var smkFileResult = jsGenerators.generateSmkFile(funcDeclParts, methodContext);
+			smkFileResult.pack = pack.format();
 			smkFileResult.funcNames = funcNames;
 			smkFileResult.methodContext = methodContext;
 			return smkFileResult;
