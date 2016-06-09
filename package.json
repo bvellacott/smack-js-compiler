@@ -1,6 +1,6 @@
 {
   "name": "smack-js-compiler",
-  "version": "1.0.01",
+  "version": "1.0.1",
   "description": "A compiler/transpiler for compiling the purely functional language 'Smack' to javascript",
   "main": "index.js",
   "scripts": {
