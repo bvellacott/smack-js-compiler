@@ -1,3 +1,10 @@
+var arrayFromArgs = function(args) {
+	var ary = [];
+	for(var i = 0; i < args.length; i++)
+		ary.push(args[i]);
+	return ary;
+};
+
 module.exports = {
 	newCompileResult : function() {
 		var set = function(key, value) {
@@ -69,7 +76,7 @@ module.exports = {
 				pc.set(arguments[1], arguments[2]);
 			},
 			addToParent : function() {
-				var args = Array.from(arguments);
+				var args = arrayFromArgs(arguments);
 				if(args.length < 2)
 					return;
 				var pc = getParentScope(this, args[0]);

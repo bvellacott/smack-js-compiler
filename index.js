@@ -1,1 +1,1 @@
-module.exports = require('./dev/smack-js-compiler.js');
+module.exports = require('./dev/compiler.js');
