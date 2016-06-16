@@ -3,7 +3,7 @@ var arrayFromArgs = function(args) {
 	for(var i = 0; i < args.length; i++)
 		ary.push(args[i]);
 	return ary;
-},
+};
 
 module.exports = {
 	newCompileResult : function() {
