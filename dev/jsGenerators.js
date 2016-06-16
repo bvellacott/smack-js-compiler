@@ -133,7 +133,7 @@ module.exports = (function(){
 		generateCodeBlock : function(sentenceSources) {
 			var cr = ncr().add('parts', '{', sentenceSources, '}\n');
 			cr.addVarDecls = function() {
-				this.parts = ['{'].concat(Array.from(arguments)).concat(this.parts.slice(1));
+				this.parts = ['{'].concat(g.arrayFromArgs(arguments)).concat(this.parts.slice(1));
 			};
 			return cr;
 		},

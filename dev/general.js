@@ -3,7 +3,7 @@ var arrayFromArgs = function(args) {
 	for(var i = 0; i < args.length; i++)
 		ary.push(args[i]);
 	return ary;
-};
+},
 
 module.exports = {
 	newCompileResult : function() {
@@ -88,9 +88,10 @@ module.exports = {
 					for(var i = 0; i < this.parts.length; i++)
 						src += (typeof this.parts[i] === 'string' ? this.parts[i] :  this.parts[i].format());
 				return src;
-			}
+			},
 		};
 	},
+	arrayFromArgs : arrayFromArgs,
 	join : function(ary, w) {
 		var res = [];
 		for(var i = 0; i < ary.length; i++) {
