@@ -1,1 +1,1 @@
-window.Smack = { compile : require('./compiler.js') };
+window.Smack = require('./compiler.js');

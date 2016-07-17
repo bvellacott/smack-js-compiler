@@ -49,7 +49,7 @@ tool = browserify(tool, {
 tool = concat(tool, {
   outputFile: '/smack-compiler.js',
   inputFiles: ['*.js'],
-  sourceMapConfig: { enabled: true },
+  sourceMapConfig: { enabled: false },
 });
 
 tool = pickFiles(tool, {

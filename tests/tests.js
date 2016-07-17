@@ -1,10 +1,23 @@
 module.exports = function(test, getFileContents, Smack) {
+	test( "error when compiling with nonexistent package", function(t){
+		var exceptionThrown = false;
+		try {
+			Smack.compile('NoPackageError', "pack this.package.doesnt.exist; func doNothing() {}", {});
+		} catch(e) {
+			exceptionThrown = true;
+		}
+		t.ok(exceptionThrown, 'failed compiling source with non-existent package');
+
+		if(typeof t.end === 'function') t.end();
+	});
+
 	getFileContents('testCode/arithmetics.smk', function(source) {
 		test( "Arithmetics", function( t ) {
 			
 			var mc = {};
 
 			console.log(source);
+			Smack.createPackage('tst', mc);
 			Smack.compile('arithmetics', source, mc);
 
 			t.equal(mc.tst._f.add(1.1, 1.1), 2.2, '1.1 + 1.1');
@@ -621,6 +634,7 @@ module.exports = function(test, getFileContents, Smack) {
 			var mc = {};
 
 			console.log(source);
+			Smack.createPackage('tst', mc);
 			Smack.compile('varAssign', source, mc);
 
 			t.equal(mc.tst._f.assingAndCompare(1.1, 2.2), true, 'Variable assign');
@@ -634,6 +648,7 @@ module.exports = function(test, getFileContents, Smack) {
 			var mc = {};
 
 			console.log(source);
+			Smack.createPackage('tst', mc);
 			Smack.compile('ifElse', source, mc);
 
 			t.equal(mc.tst._f.ifOneElseIfTwoElse(1), 1, 'If part of if else if else');
@@ -655,6 +670,7 @@ module.exports = function(test, getFileContents, Smack) {
 			var mc = {};
 
 			console.log(source);
+			Smack.createPackage('tst', mc);
 			Smack.compile('while', source, mc);
 
 			t.equal(mc.tst._f.addOneWhileLessThan(10000), 10000, 'While loop test');
@@ -672,6 +688,7 @@ module.exports = function(test, getFileContents, Smack) {
 			var mc = {};
 
 			console.log(source);
+			Smack.createPackage('tst', mc);
 			Smack.compile('invoke', source, mc);
 
 			t.equal(mc.tst._f.invokeAdd(1, 1), 2, 'Invokation with parameters');

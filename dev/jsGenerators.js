@@ -139,7 +139,10 @@ module.exports = (function(){
 		},
 		generateFuncDecl : function(pack, ids, codeBlockPart, methodContext) {
 			var funcPath = ncr().add('parts', pack, '._f.', ids[0]);
-			eval(ncr().add('parts', 'if(methodContext.', pack, ' && methodContext.', funcPath, ') throw "the function ', funcPath, ' already exists";').format())
+			var noPackageErr = ncr().add('parts', "throw \"package: ", pack, " doesn\'t exist\";");
+			var functionExistsErr = ncr().add('parts', 'throw "the function ', funcPath, ' already exists";');
+			eval(ncr().add('parts', "try{ if(!methodContext.", pack, ")", noPackageErr, "} catch(e) { ", noPackageErr, " }").format())
+			eval(ncr().add('parts', 'if(methodContext.', pack, ' && methodContext.', funcPath, ') ', functionExistsErr).format())
 			var cr = ncr().set('type', 'funcDecl').add('parts', codeBlockPart);
 			codeBlockPart.addVarDecls(this.generateVarDecls(cr.varDecl, ids));
 			cr = ncr().add('parts', funcPath, ' = function(', g.join(ids.slice(1), ', '), ')', codeBlockPart);

@@ -3,6 +3,7 @@ var SmackLexer = require('./smack/SmackLexer').SmackLexer;
 var SmackParser = require('./smack/SmackParser').SmackParser;
 var compilers = require('./compilers');
 var stdlib = require('./stdlib');
+var g = require('./general');
 
 module.exports = (function(){
 	var createUnit = function(name, smkSource, targetSource, pack, funcNames, methodContext) {
@@ -35,19 +36,28 @@ module.exports = (function(){
 		stdlib.extend(methodContext);
 		var packParts = compilers.getPackageParts(ctx.packageDecl(0));
 		var curObj = methodContext;
-		for(var i = 0; i < packParts.length; i++) {
-			if(!curObj[packParts[i]] || typeof curObj[packParts[i]] !== 'object')
-				curObj[packParts[i]] = { _f : {} };
-			curObj = curObj[packParts[i]];
-		}
+		
+		// var noPackageErr = ncr().add('parts', "throw \"package: ", pack, " doesn\'t exist\";");
+		g.validatePackageExists(packParts, methodContext);
+		// eval(ncr().add('parts', "try{ if(!methodContext.", pack, ")", noPackageErr, "} catch(e) { ", noPackageErr, " }").format())
+		
+		// for(var i = 0; i < packParts.length; i++) {
+		// 	if(!curObj[packParts[i]] || typeof curObj[packParts[i]] !== 'object')
+		// 		curObj[packParts[i]] = { _f : {} };
+		// 	curObj = curObj[packParts[i]];
+		// }
 	}
 	
-	return function(name, smkSource, methodContext) {
-		var tree = getParseTree(smkSource);
-		initMethodContext(tree, methodContext);
-		var result = compilers.compileSmkFile(tree, methodContext)
-		var src = result.format();
-		eval(src);
-		return createUnit(name, smkSource, src, result.pack, result.funcNames, methodContext);
-	};
+	return { 
+		createPackage: g.createPackage,
+		removePackage: g.removePackage,
+		compile(name, smkSource, methodContext) {
+			var tree = getParseTree(smkSource);
+			initMethodContext(tree, methodContext);
+			var result = compilers.compileSmkFile(tree, methodContext)
+			var src = result.format();
+			eval(src);
+			return createUnit(name, smkSource, src, result.pack, result.funcNames, methodContext);
+		}
+	}
 })();

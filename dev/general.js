@@ -6,6 +6,50 @@ var arrayFromArgs = function(args) {
 };
 
 module.exports = {
+	validatePackageExists(pack, methodContext) {
+		if(typeof pack === 'string')
+			pack = pack.split('.');
+		var curObj = methodContext;
+		for(var i = 0; i < pack.length; i++)
+			if(!curObj[pack[i]] || typeof curObj[pack[i]] !== 'object')
+				throw "package: " + pack.join('.') + " doesn't exist";
+	},
+	createPackage(pack, methodContext) {
+		if(typeof pack === 'string')
+			pack = pack.split('.');
+		var curObj = methodContext;
+		for(var i = 0; i < pack.length; i++) {
+			if(!curObj[pack[i]] || typeof curObj[pack[i]] !== 'object')
+				curObj[pack[i]] = { _f : {} };
+			curObj = curObj[pack[i]];
+		}
+	},
+	removePackage(pack, methodContext) {
+		if(typeof pack === 'string')
+			pack = pack.split('.');
+		var parent = null;
+		var curKey = null;
+		var curObj = methodContext;
+		for(var i = 0; i < pack.length; i++) {
+			if(!curObj[pack[i]] || typeof curObj[pack[i]] !== 'object')
+				return;
+			parent = curObj;
+			curKey = pack[i];
+			curObj = parent[curKey];
+		}
+		delete parent[curKey];
+	},
+	getPackage(pack, methodContext) {
+		if(typeof pack === 'string')
+			pack = pack.split('.');
+		var curObj = methodContext;
+		for(var i = 0; i < pack.length; i++) {
+			if(!curObj[pack[i]] || typeof curObj[pack[i]] !== 'object')
+				curObj[pack[i]] = { _f : {} };
+			curObj = curObj[pack[i]];
+		}
+		return curObj;
+	},
 	newCompileResult : function() {
 		var set = function(key, value) {
 			this[key] = value;

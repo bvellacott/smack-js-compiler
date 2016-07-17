@@ -12419,7 +12419,7 @@ exports.ParseTreeWalker = Tree.ParseTreeWalker;
 },{}],46:[function(require,module,exports){
 'use strict';
 
-window.Smack = { compile: require('./compiler.js') };
+window.Smack = require('./compiler.js');
 },{"./compiler.js":47}],47:[function(require,module,exports){
 'use strict';
 
@@ -12428,6 +12428,7 @@ var SmackLexer = require('./smack/SmackLexer').SmackLexer;
 var SmackParser = require('./smack/SmackParser').SmackParser;
 var compilers = require('./compilers');
 var stdlib = require('./stdlib');
+var g = require('./general');
 
 module.exports = (function () {
 	var createUnit = function createUnit(name, smkSource, targetSource, pack, funcNames, methodContext) {
@@ -12459,22 +12460,32 @@ module.exports = (function () {
 		stdlib.extend(methodContext);
 		var packParts = compilers.getPackageParts(ctx.packageDecl(0));
 		var curObj = methodContext;
-		for (var i = 0; i < packParts.length; i++) {
-			if (!curObj[packParts[i]] || typeof curObj[packParts[i]] !== 'object') curObj[packParts[i]] = { _f: {} };
-			curObj = curObj[packParts[i]];
-		}
+
+		// var noPackageErr = ncr().add('parts', "throw \"package: ", pack, " doesn\'t exist\";");
+		g.validatePackageExists(packParts, methodContext);
+		// eval(ncr().add('parts', "try{ if(!methodContext.", pack, ")", noPackageErr, "} catch(e) { ", noPackageErr, " }").format())
+
+		// for(var i = 0; i < packParts.length; i++) {
+		// 	if(!curObj[packParts[i]] || typeof curObj[packParts[i]] !== 'object')
+		// 		curObj[packParts[i]] = { _f : {} };
+		// 	curObj = curObj[packParts[i]];
+		// }
 	};
 
-	return function (name, smkSource, methodContext) {
-		var tree = getParseTree(smkSource);
-		initMethodContext(tree, methodContext);
-		var result = compilers.compileSmkFile(tree, methodContext);
-		var src = result.format();
-		eval(src);
-		return createUnit(name, smkSource, src, result.pack, result.funcNames, methodContext);
+	return {
+		createPackage: g.createPackage,
+		removePackage: g.removePackage,
+		compile: function compile(name, smkSource, methodContext) {
+			var tree = getParseTree(smkSource);
+			initMethodContext(tree, methodContext);
+			var result = compilers.compileSmkFile(tree, methodContext);
+			var src = result.format();
+			eval(src);
+			return createUnit(name, smkSource, src, result.pack, result.funcNames, methodContext);
+		}
 	};
 })();
-},{"./compilers":48,"./smack/SmackLexer":51,"./smack/SmackParser":53,"./stdlib":55,"antlr4":41}],48:[function(require,module,exports){
+},{"./compilers":48,"./general":49,"./smack/SmackLexer":51,"./smack/SmackParser":53,"./stdlib":55,"antlr4":41}],48:[function(require,module,exports){
 'use strict';
 
 var SmackParser = require('./smack/SmackParser').SmackParser;
@@ -12634,7 +12645,48 @@ module.exports = (function () {
 },{"./jsGenerators":50,"./smack/SmackParser":53}],49:[function(require,module,exports){
 'use strict';
 
+var arrayFromArgs = function arrayFromArgs(args) {
+	var ary = [];
+	for (var i = 0; i < args.length; i++) ary.push(args[i]);
+	return ary;
+};
+
 module.exports = {
+	validatePackageExists: function validatePackageExists(pack, methodContext) {
+		if (typeof pack === 'string') pack = pack.split('.');
+		var curObj = methodContext;
+		for (var i = 0; i < pack.length; i++) if (!curObj[pack[i]] || typeof curObj[pack[i]] !== 'object') throw "package: " + pack.join('.') + " doesn't exist";
+	},
+	createPackage: function createPackage(pack, methodContext) {
+		if (typeof pack === 'string') pack = pack.split('.');
+		var curObj = methodContext;
+		for (var i = 0; i < pack.length; i++) {
+			if (!curObj[pack[i]] || typeof curObj[pack[i]] !== 'object') curObj[pack[i]] = { _f: {} };
+			curObj = curObj[pack[i]];
+		}
+	},
+	removePackage: function removePackage(pack, methodContext) {
+		if (typeof pack === 'string') pack = pack.split('.');
+		var parent = null;
+		var curKey = null;
+		var curObj = methodContext;
+		for (var i = 0; i < pack.length; i++) {
+			if (!curObj[pack[i]] || typeof curObj[pack[i]] !== 'object') return;
+			parent = curObj;
+			curKey = pack[i];
+			curObj = parent[curKey];
+		}
+		delete parent[curKey];
+	},
+	getPackage: function getPackage(pack, methodContext) {
+		if (typeof pack === 'string') pack = pack.split('.');
+		var curObj = methodContext;
+		for (var i = 0; i < pack.length; i++) {
+			if (!curObj[pack[i]] || typeof curObj[pack[i]] !== 'object') curObj[pack[i]] = { _f: {} };
+			curObj = curObj[pack[i]];
+		}
+		return curObj;
+	},
 	newCompileResult: function newCompileResult() {
 		var set = function set(key, value) {
 			this[key] = value;
@@ -12690,7 +12742,7 @@ module.exports = {
 				pc.set(arguments[1], arguments[2]);
 			},
 			addToParent: function addToParent() {
-				var args = Array.from(arguments);
+				var args = arrayFromArgs(arguments);
 				if (args.length < 2) return;
 				var pc = getParentScope(this, args[0]);
 				pc.add.apply(pc, args.slice(1));
@@ -12702,6 +12754,7 @@ module.exports = {
 			}
 		};
 	},
+	arrayFromArgs: arrayFromArgs,
 	join: function join(ary, w) {
 		var res = [];
 		for (var i = 0; i < ary.length; i++) {
@@ -12839,13 +12892,16 @@ module.exports = (function () {
 		generateCodeBlock: function generateCodeBlock(sentenceSources) {
 			var cr = ncr().add('parts', '{', sentenceSources, '}\n');
 			cr.addVarDecls = function () {
-				this.parts = ['{'].concat(Array.from(arguments)).concat(this.parts.slice(1));
+				this.parts = ['{'].concat(g.arrayFromArgs(arguments)).concat(this.parts.slice(1));
 			};
 			return cr;
 		},
 		generateFuncDecl: function generateFuncDecl(pack, ids, codeBlockPart, methodContext) {
 			var funcPath = ncr().add('parts', pack, '._f.', ids[0]);
-			eval(ncr().add('parts', 'if(methodContext.', pack, ' && methodContext.', funcPath, ') throw "the function ', funcPath, ' already exists";').format());
+			var noPackageErr = ncr().add('parts', "throw \"package: ", pack, " doesn\'t exist\";");
+			var functionExistsErr = ncr().add('parts', 'throw "the function ', funcPath, ' already exists";');
+			eval(ncr().add('parts', "try{ if(!methodContext.", pack, ")", noPackageErr, "} catch(e) { ", noPackageErr, " }").format());
+			eval(ncr().add('parts', 'if(methodContext.', pack, ' && methodContext.', funcPath, ') ', functionExistsErr).format());
 			var cr = ncr().set('type', 'funcDecl').add('parts', codeBlockPart);
 			codeBlockPart.addVarDecls(this.generateVarDecls(cr.varDecl, ids));
 			cr = ncr().add('parts', funcPath, ' = function(', g.join(ids.slice(1), ', '), ')', codeBlockPart);
@@ -13354,4 +13410,4 @@ module.exports.extend = function (mc) {
 		return ary.length;
 	};
 };
-},{}]},{},[46])//# sourceMappingURL=smack-compiler.map
+},{}]},{},[46])
