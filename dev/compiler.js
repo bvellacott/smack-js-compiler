@@ -6,11 +6,11 @@ var stdlib = require('./stdlib');
 var g = require('./general');
 
 module.exports = (function(){
-	var createUnit = function(name, smkSource, targetSource, pack, funcNames, methodContext) {
+	var createUnit = function(smkSource, targetSource, pack, funcNames, methodContext) {
 		var packParts = pack.split('.');
 		var packAbr = packParts[packParts.length-1];
 		return {
-			name : name,
+			//name : name,
 			smkSource : smkSource,
 			targetSource : targetSource,
 			pack : pack,
@@ -19,7 +19,7 @@ module.exports = (function(){
 			methodContext : methodContext
 		};
 	}
-	
+
 	var getParseTree = function(source) {
 		var chars = new antlr4.InputStream(source);
 		var lexer = new SmackLexer(chars);
@@ -29,35 +29,36 @@ module.exports = (function(){
 		return parser.smkFile();
 	}
 
-	var initMethodContext = function(ctx, methodContext) {
+	var initMethodContext = function(pack, methodContext) {
 		if(!methodContext || typeof methodContext !== 'object')
 			throw 'The method context must be an object';
 		// Add the standard library if it's missing
 		stdlib.extend(methodContext);
-		var packParts = compilers.getPackageParts(ctx.packageDecl(0));
+		//var packParts = pack.split('.');
 		var curObj = methodContext;
-		
+
 		// var noPackageErr = ncr().add('parts', "throw \"package: ", pack, " doesn\'t exist\";");
-		g.validatePackageExists(packParts, methodContext);
+		g.validatePackageExists(pack, methodContext);
 		// eval(ncr().add('parts', "try{ if(!methodContext.", pack, ")", noPackageErr, "} catch(e) { ", noPackageErr, " }").format())
-		
+
 		// for(var i = 0; i < packParts.length; i++) {
 		// 	if(!curObj[packParts[i]] || typeof curObj[packParts[i]] !== 'object')
 		// 		curObj[packParts[i]] = { _f : {} };
 		// 	curObj = curObj[packParts[i]];
 		// }
 	}
-	
-	return { 
+
+	return {
+		getPackage: g.getPackage,
 		createPackage: g.createPackage,
 		removePackage: g.removePackage,
-		compile(name, smkSource, methodContext) {
+		compile(pack, smkSource, methodContext) {
 			var tree = getParseTree(smkSource);
-			initMethodContext(tree, methodContext);
-			var result = compilers.compileSmkFile(tree, methodContext)
+			initMethodContext(pack, methodContext);
+			var result = compilers.compileSmkFile(tree, pack, methodContext)
 			var src = result.format();
 			eval(src);
-			return createUnit(name, smkSource, src, result.pack, result.funcNames, methodContext);
+			return createUnit(pack, smkSource, src, pack, result.funcNames, methodContext);
 		}
 	}
 })();

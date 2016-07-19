@@ -13,12 +13,12 @@ module.exports = function(test, getFileContents, Smack) {
 
 	getFileContents('testCode/arithmetics.smk', function(source) {
 		test( "Arithmetics", function( t ) {
-			
+
 			var mc = {};
 
 			console.log(source);
 			Smack.createPackage('tst', mc);
-			Smack.compile('arithmetics', source, mc);
+			Smack.compile('tst', source, mc);
 
 			t.equal(mc.tst._f.add(1.1, 1.1), 2.2, '1.1 + 1.1');
 
@@ -31,13 +31,13 @@ module.exports = function(test, getFileContents, Smack) {
 			t.equal(mc.tst._f.add(0, -1.1), -1.1, '0 + -1.1');
 
 			t.equal(mc.tst._f.add(1.1, 0), 1.1, '1.1 + 0');
-			
+
 			t.equal(mc.tst._f.add("string1", " string2"), "string1 string2", '"string1" + " string2"');
-			
+
 			t.equal(mc.tst._f.add(1, " string2"), "1 string2", '1 + " string2"');
-			
+
 			t.equal(mc.tst._f.add("string ", 2), "string 2", '"string " + 2');
-			
+
 
 			t.equal(mc.tst._f.sub(1.1, 1.1), 0, '1.1 - 1.1');
 
@@ -123,14 +123,14 @@ module.exports = function(test, getFileContents, Smack) {
 
 			t.equal(mc.tst._f.pow(-0, -1), -Infinity, '-0^-1');
 
-			
+
 			t.equal(mc.tst._f.powParen(-1, 2), 1, '(-1)^2');
-			
+
 			t.equal(mc.tst._f.powParen(-1, 3), -1, '(-1)^3');
 
 
 			t.equal(mc.tst._f.powSignedParen(1, 2 ), -1, '-(1)^2');
-			
+
 			t.equal(mc.tst._f.powSignedParen(-1, 3), 1, '-(-1)^3');
 
 
@@ -282,7 +282,7 @@ module.exports = function(test, getFileContents, Smack) {
 			t.equal(mc.tst._f.parenDivThenPow(1,2,4), 0.0625, '(1 / 2)^4');
 
 			t.equal(mc.tst._f.parenModThenPow(2,3,4), 16, '(2 % 3)^4');
-			
+
 
 			t.equal(mc.tst._f.parenPowThenPow(2,1,3), 8, '(2^1)^3');
 
@@ -607,22 +607,22 @@ module.exports = function(test, getFileContents, Smack) {
 			t.equal(mc.tst._f.powGePow(1,1,1,1), true, '1^1 >= 1^1');
 
 			t.equal(mc.tst._f.powGePow(1,-1,-1,1), true, '1^-1 >= 1^1');
-			
+
 			t.equal(mc.tst._f.powGePow(2,1,1,1), true, '2^1 >= 1^1');
 
-			
+
 			t.equal(mc.tst._f.andOr(false,true,false), false, 'false && true || false');
-			
+
 			t.equal(mc.tst._f.orAnd(true,false,true), true, 'true || false && true');
-			
-			
+
+
 			t.equal(mc.tst._f.andParenOr(false,true,false), false, 'false && (true || false)');
-			
+
 			t.equal(mc.tst._f.orParenAnd(true,false,true), true, 'true || (false && true)');
-			
-			
+
+
 			t.equal(mc.tst._f.notAnd(true,false), false, '!true && false');
-			
+
 			t.equal(mc.tst._f.notOr(false,true), true, '!false || true');
 
 			if(typeof t.end === 'function') t.end();
@@ -635,7 +635,7 @@ module.exports = function(test, getFileContents, Smack) {
 
 			console.log(source);
 			Smack.createPackage('tst', mc);
-			Smack.compile('varAssign', source, mc);
+			Smack.compile('tst', source, mc);
 
 			t.equal(mc.tst._f.assingAndCompare(1.1, 2.2), true, 'Variable assign');
 
@@ -649,7 +649,7 @@ module.exports = function(test, getFileContents, Smack) {
 
 			console.log(source);
 			Smack.createPackage('tst', mc);
-			Smack.compile('ifElse', source, mc);
+			Smack.compile('tst', source, mc);
 
 			t.equal(mc.tst._f.ifOneElseIfTwoElse(1), 1, 'If part of if else if else');
 
@@ -671,25 +671,25 @@ module.exports = function(test, getFileContents, Smack) {
 
 			console.log(source);
 			Smack.createPackage('tst', mc);
-			Smack.compile('while', source, mc);
+			Smack.compile('tst', source, mc);
 
 			t.equal(mc.tst._f.addOneWhileLessThan(10000), 10000, 'While loop test');
 
 			t.equal(mc.tst._f.callWithInput('tst.addOneWhileLessThan', [10000]), 10000, 'Exec with input test');
-			
+
 			t.equal(mc.tst._f.callWithoutInput('tst.returnTrue'), true, 'Exec without input test');
 
 			if(typeof t.end === 'function') t.end();
 		});
 	});
-			
+
 	getFileContents('testCode/invoke.smk', function(source) {
 		test( "Invoke", function( t ) {
 			var mc = {};
 
 			console.log(source);
 			Smack.createPackage('tst', mc);
-			Smack.compile('invoke', source, mc);
+			Smack.compile('tst', source, mc);
 
 			t.equal(mc.tst._f.invokeAdd(1, 1), 2, 'Invokation with parameters');
 

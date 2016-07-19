@@ -1,4 +1,4 @@
-pack tst;
+//pack tst;
 
 func isFibonacci(val) {
 	fib1 = 0;

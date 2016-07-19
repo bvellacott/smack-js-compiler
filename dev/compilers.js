@@ -165,9 +165,9 @@ module.exports = (function(){
 			return jsGenerators.generateCodeBlock(sentenceParts);
 		},
 		compileFuncDecl : function(ctx, pack, methodContext) {
-			var codeBlockPart 
+			var codeBlockPart
 			var ids = [];
-			
+
 			for(var i = 0; i < ctx.children.length; i++) {
 				var c = ctx.children[i];
 				if(c.symbol && c.symbol.type === SmackParser.Id)
@@ -177,8 +177,8 @@ module.exports = (function(){
 			}
 			return jsGenerators.generateFuncDecl(pack, ids, codeBlockPart, methodContext);
 		},
-		compileSmkFile : function(ctx, methodContext) {
-			var pack = this.compilePackageDecl(ctx.packageDecl(0));
+		compileSmkFile : function(ctx, pack, methodContext) {
+			//var pack = this.compilePackageDecl(ctx.packageDecl(0));
 			var funcNames = [];
 			var funcDeclParts = [];
 			for(var i = 0; i < ctx.children.length; i++) {
@@ -189,7 +189,6 @@ module.exports = (function(){
 				}
 			}
 			var smkFileResult = jsGenerators.generateSmkFile(funcDeclParts, methodContext);
-			smkFileResult.pack = pack.format();
 			smkFileResult.funcNames = funcNames;
 			smkFileResult.methodContext = methodContext;
 			return smkFileResult;

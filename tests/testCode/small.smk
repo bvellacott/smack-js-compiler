@@ -1,4 +1,4 @@
-pack test;
+//pack test;
 
 func doNothing(a) { ret null; }
 

@@ -18,36 +18,36 @@
 //OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 //SOFTWARE.
 
-// This is the grammar used to generate the select lexer and parser using the 
+// This is the grammar used to generate the select lexer and parser using the
 // antlr4 tool
 
 grammar Smack;
 import Json;
 
 smkFile
-	:	packageDecl funcDecl*
+	:	funcDecl*
 	;
 
 packageDecl
 	:	'pack' dottedId ';'
 	;
-	
+
 varAssign
 	:	jsonPath '=' expression
 	;
-	
+
 funcDecl
 	:	'func' Id '(' Id? (',' Id)* ')' codeBlock
 	;
-	
+
 funcInvoke
 	:	dottedId '(' resolvable? (',' resolvable)* ')'
 	;
-	
+
 jsonPath
 	:	Id (keyRef)*
 	;
-	
+
 dottedId
 	:	Id ('.' Id)*
 	;
@@ -59,24 +59,24 @@ keyRef
 retStatement
 	:	'ret' expression
 	;
-	
+
 ifStat
 	:	'if' '(' expression ')' codeBlock elseIfStat* elseStat?
 	;
-	
+
 elseIfStat
 	:	'else' 'if' '(' expression ')' codeBlock
 	;
-	
+
 elseStat
 	:	'else' codeBlock
 	;
-	
+
 loop
 	:	'while' '(' expression ')' codeBlock
 	;
-	
-expression 
+
+expression
 	:	'(' expression ')'						# parenExpr
 	|	<assoc=right> expression Pow expression	# powExpr
 	|	expression Mul expression				# mulExpr
@@ -95,24 +95,24 @@ expression
 	|	expression Or expression				# orExpr
 	|	resolvable								# atomExpr
 	;
-	
+
 resolvable
-	:	value		
-	|	jsonPath	
+	:	value
+	|	jsonPath
 	|	funcInvoke
 	;
-	
+
 codeBlock
-	:	'{' sentence* '}' 
+	:	'{' sentence* '}'
 	;
-	
+
 sentence
 	:	statement ';'
 	|	loop
 	| 	ifStat
 //	|	comment
 	;
-	
+
 statement
 	:	varAssign
 	|	funcInvoke
@@ -138,13 +138,12 @@ Or		:	'||'	;
 Id
 	:	[$a-zA-Z_]+[$a-zA-Z_0-9]*
 	;
-	
+
 // Whitespace and comments are ignored
 Comment
 	:	'//' ~('\n')* '\n' -> skip
 	;
 
-WS 
-	: [ \t\r\n]+ -> skip 
-	; 
-	 
+WS
+	: [ \t\r\n]+ -> skip
+	;

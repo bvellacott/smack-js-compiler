@@ -1,4 +1,4 @@
-pack tst;
+//pack tst;
 
 func add(a, b) { ret a + b; }
 
@@ -243,4 +243,3 @@ func orParenAnd(a, b, c) { ret a || (b && c); }
 func notAnd(a, b) { ret !a && b; }
 
 func notOr(a, b) { ret !a || b; }
-

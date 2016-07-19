@@ -1,4 +1,4 @@
-pack tst;
+//pack tst;
 
 func assingAndCompare(a, b) {
 	c = a;
@@ -6,4 +6,3 @@ func assingAndCompare(a, b) {
 
 	ret a + b == d + c;
 }
-
