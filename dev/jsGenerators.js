@@ -110,11 +110,11 @@ module.exports = (function(){
 			else
 				cr.add('parts', pack, '._f.', ids[0]);
 			cr.add('parts', '(', g.join(resolvableParts, ', '), ')');
-			return cr;	
+			return cr;
 		},
 		generateRetStatement : function(expressionPart) {
 			return ncr().add('parts', 'return ', expressionPart);
-		},		
+		},
 		generateLoop : function(expressionPart, codeBlockPart) {
 			return ncr().add('parts', 'while', '(', expressionPart, ')', codeBlockPart);
 		},

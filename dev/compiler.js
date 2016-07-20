@@ -47,7 +47,7 @@ module.exports = (function(){
 			var result = compilers.compileSmkFile(tree, pack, methodContext)
 			var src = result.format();
 			eval(src);
-			return createUnit(pack, smkSource, src, pack, result.funcNames, methodContext);
+			return createUnit(smkSource, src, pack, result.funcNames, methodContext);
 		}
 	}
 })();
