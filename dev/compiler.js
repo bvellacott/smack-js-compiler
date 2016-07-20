@@ -7,14 +7,13 @@ var g = require('./general');
 
 module.exports = (function(){
 	var createUnit = function(smkSource, targetSource, pack, funcNames, methodContext) {
-		var packParts = pack.split('.');
-		var packAbr = packParts[packParts.length-1];
+		if(typeof pack === 'string')
+			pack = pack.split('.');
 		return {
-			//name : name,
 			smkSource : smkSource,
 			targetSource : targetSource,
 			pack : pack,
-			packAbr : packAbr,
+			packAbr : pack[pack.length-1],
 			funcNames : funcNames,
 			methodContext : methodContext
 		};
@@ -34,18 +33,8 @@ module.exports = (function(){
 			throw 'The method context must be an object';
 		// Add the standard library if it's missing
 		stdlib.extend(methodContext);
-		//var packParts = pack.split('.');
 		var curObj = methodContext;
-
-		// var noPackageErr = ncr().add('parts', "throw \"package: ", pack, " doesn\'t exist\";");
 		g.validatePackageExists(pack, methodContext);
-		// eval(ncr().add('parts', "try{ if(!methodContext.", pack, ")", noPackageErr, "} catch(e) { ", noPackageErr, " }").format())
-
-		// for(var i = 0; i < packParts.length; i++) {
-		// 	if(!curObj[packParts[i]] || typeof curObj[packParts[i]] !== 'object')
-		// 		curObj[packParts[i]] = { _f : {} };
-		// 	curObj = curObj[packParts[i]];
-		// }
 	}
 
 	return {

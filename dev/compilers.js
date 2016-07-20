@@ -178,7 +178,8 @@ module.exports = (function(){
 			return jsGenerators.generateFuncDecl(pack, ids, codeBlockPart, methodContext);
 		},
 		compileSmkFile : function(ctx, pack, methodContext) {
-			//var pack = this.compilePackageDecl(ctx.packageDecl(0));
+			if(Array.isArray(pack))
+				pack = pack.join('.');
 			var funcNames = [];
 			var funcDeclParts = [];
 			for(var i = 0; i < ctx.children.length; i++) {
