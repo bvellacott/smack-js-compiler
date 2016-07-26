@@ -10,9 +10,11 @@ module.exports = {
 		if(typeof pack === 'string')
 			pack = pack.split('.');
 		var curObj = methodContext;
-		for(var i = 0; i < pack.length; i++)
+		for(var i = 0; i < pack.length; i++) {
 			if(!curObj[pack[i]] || typeof curObj[pack[i]] !== 'object')
 				throw "package: " + pack.join('.') + " doesn't exist";
+			curObj = curObj[pack[i]];
+		}
 	},
 	createPackage(pack, methodContext) {
 		if(typeof pack === 'string')
