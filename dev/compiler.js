@@ -42,7 +42,7 @@ module.exports = (function(){
 		createPackage: g.createPackage,
 		removePackage: g.removePackage,
 		getParseTree: getParseTree,
-		compile(pack, smkSource, methodContext) {
+		compile: function(pack, smkSource, methodContext) {
 			var tree = getParseTree(smkSource);
 			initMethodContext(pack, methodContext);
 			var result = compilers.compileSmkFile(tree, pack, methodContext)

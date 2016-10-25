@@ -6,7 +6,7 @@ var arrayFromArgs = function(args) {
 };
 
 module.exports = {
-	validatePackageExists(pack, methodContext) {
+	validatePackageExists: function(pack, methodContext) {
 		if(typeof pack === 'string')
 			pack = pack.split('.');
 		var curObj = methodContext;
@@ -16,7 +16,7 @@ module.exports = {
 			curObj = curObj[pack[i]];
 		}
 	},
-	createPackage(pack, methodContext) {
+	createPackage: function(pack, methodContext) {
 		if(typeof pack === 'string')
 			pack = pack.split('.');
 		var curObj = methodContext;
@@ -26,7 +26,7 @@ module.exports = {
 			curObj = curObj[pack[i]];
 		}
 	},
-	removePackage(pack, methodContext) {
+	removePackage: function(pack, methodContext) {
 		if(typeof pack === 'string')
 			pack = pack.split('.');
 		var parent = null;
@@ -41,7 +41,7 @@ module.exports = {
 		}
 		delete parent[curKey];
 	},
-	getPackage(pack, methodContext) {
+	getPackage: function(pack, methodContext) {
 		if(typeof pack === 'string')
 			pack = pack.split('.');
 		var curObj = methodContext;
@@ -52,7 +52,7 @@ module.exports = {
 		}
 		return curObj;
 	},
-	newCompileResult : function() {
+	newCompileResult: function() {
 		var set = function(key, value) {
 			this[key] = value;
 			return this;
