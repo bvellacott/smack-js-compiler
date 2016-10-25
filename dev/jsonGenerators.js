@@ -3,29 +3,26 @@ var ncr = require('./general').newCompileResult;
 
 module.exports = (function(){
 	return {
-		generateDottedId : function(ids) {
-			return ncr().add('parts', g.join(ids, '.'));
-		},
 		generatePackageDecl : function(ids) {
-			return this.generateDottedId(ids);
+			return ncr().add('parts', 'packIds: [ ', g.join(ids, ', '), ' ]');
 		},
 		generateComment : function(str) {
 			return ' ';//'// ' + str + '\n';
 		},
 		generateClosedStatement : function(openStatPart) {
-			return ncr().add('parts', openStatPart, ';');
+			return ncr().add('parts', openStatPart);
 		},
 		generateVarDecls : function(jsonPathParts, ids) {
 			if(!jsonPathParts || jsonPathParts.length === 0)
 				return '';
-			var cr = ncr();
+			var cr = ncr().add('parts', 'varDeclarations: [ ');
 			var idMap = {};
 			for(var i = 0; i < ids.length; i++)
 				idMap[ids[i]] = true;
 			for(var i = 0; i < jsonPathParts.length; i++) {
 				var name = jsonPathParts[i].format();
 				if(!idMap[name])
-					cr.add('parts', 'var ', name, ';');
+					cr.add('parts', name, ';');
 			}
 			return cr;
 		},
