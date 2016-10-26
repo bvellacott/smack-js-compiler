@@ -9,9 +9,14 @@ var rename = require('broccoli-stew').rename;
 
 // Tests
 var testsStatic = pickFiles('./tests', {
-  include: ['tests.html', 'tests-min.html', 'lib/*', 'css/*', 'testCode/*'],
+  include: ['tests.html', 'tests-min.html', 'lib/*', 'css/*'],
   destDir: '.'
 });
+
+var testsStatic = mergeTrees([
+  testsStatic,
+  pickFiles('.', { include: ['testCode/*'], destDir: '.' })
+]);
 
 var tests = pickFiles('./tests', {
   include: ['tests.js', 'tests.html', 'tests-min.html', 'browserTestHeader.js', 'browserTestFooter.js'],

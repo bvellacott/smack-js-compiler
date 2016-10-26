@@ -1,5 +1,5 @@
-var Test = require('./tests.js');
-var Smack = require('../dev/compiler.js');
+var Test = require('./tests/tests.js');
+var Smack = require('./dev/compiler.js');
 
 var getFileContents = function(path, cb) {
 	var fs = require('fs');

@@ -4,7 +4,7 @@
   "description": "A compiler/transpiler for compiling the purely functional language 'Smack' to javascript",
   "main": "index.js",
   "scripts": {
-    "test": "node dev/tests/testRunner.js"
+    "test": "node testRunner.js"
   },
   "keywords": [
     "pure",
